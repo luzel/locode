@@ -25,8 +25,8 @@ You can quickly deploy **loCode** using Docker and `docker-compose`.
 
 1. Clone the repository:  
    ```sh
-   git clone https://github.com/your-repo/loCode.git
-   cd loCode
+   git clone https://github.com/luzel/locode
+   cd locode
    ```  
 2. Run the app using Docker Compose:  
    ```sh
@@ -43,24 +43,24 @@ If you want to run **loCode** on a different port than `5180`, use the following
 
 ```yaml
 services:
-   php:
-      build:
+  php:
+    build:
       context: ./
       dockerfile: ./server/Dockerfile
-      container_name: symfony_php
-      working_dir: /var/www/html
-      volumes:
+    container_name: symfony_php
+    working_dir: /var/www/html
+    volumes:
       - ./app/:/var/www/html
-      ports:
+    ports:
       - "5190:9000"
-      command: php-fpm
+    command: php-fpm
 
-   webserver:
-      image: caddy:latest
-      container_name: symfony_web
-      ports:
+  webserver:
+    image: caddy:latest
+    container_name: symfony_web
+    ports:
       - "5180:80"
-      volumes:
+    volumes:
       - ./app/:/var/www/html
       - ./server/Caddyfile:/etc/caddy/Caddyfile
 ```
@@ -73,7 +73,7 @@ services:
    npm run build
    ```  
 2. Start the local server:  
-   ```sh
+   ```bash
    symfony server:start --port=5180
    ```  
 3. Open `http://localhost:5180` in your browser.  
