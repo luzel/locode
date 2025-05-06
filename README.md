@@ -2,6 +2,8 @@
 
 **loCode** is a self-hosted web application designed for developers who need a quick and reliable set of tools for everyday tasks—without relying on online services that could compromise data security. Built with **PHP Symfony** on the backend and **AlpineJS** on the frontend, loCode provides a fast, privacy-focused experience that runs entirely on your local machine or private server.
 
+![Locode Screenshot](/docs/screenshot01.jpg)
+
 ## 🛠 Features  
 - **Hash Functions** – Generate MD5, SHA-256, and other cryptographic hashes.  
 - **Serialization Tools** – Encode/decode PHP serialize/unserialize data.  
