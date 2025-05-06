@@ -1,0 +1,168 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Serialize{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-php.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            localStorageKey: 'locode_php_serialize_left_content',
+            editor_right: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('formHandler', () => ({
+                        submit() {
+                            const formData = this.getFormData(this.$event.target);
+
+                            let tokens = [];
+                            for(let i = 0; i < 20; i++) {
+                                let token = this.generateToken(formData.length, formData.chars);
+                                tokens.push(token);
+                            }
+
+                            App.editor_right.setValue(tokens.join("\n"), -1);
+                        },
+                        getFormData(form) {
+                            let data = {};
+                            new FormData(form).forEach((value, key) => {
+                                if (data[key]) {
+                                    if (Array.isArray(data[key])) {
+                                        data[key].push(value);
+                                    } else {
+                                        data[key] = [data[key], value];
+                                    }
+                                } else {
+                                    data[key] = value;
+                                }
+                            });
+                            return data;
+                        },
+                        generateToken(length, chars) {
+                            let token = '';
+
+                            let possible = '';
+                            if (chars.includes('uppercase')) {
+                                possible += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                            }
+                            if (chars.includes('lowercase')) {
+                                possible += 'abcdefghijklmnopqrstuvwxyz';
+                            }
+                            if (chars.includes('numbers')) {
+                                possible += '0123456789';
+                            }
+                            if (chars.includes('special')) {
+                                possible += '!@#$%^&*';
+                            }
+                            for (let i = 0; i < length; i++) {
+                                token += possible.charAt(Math.floor(Math.random() * possible.length));
+                            }
+
+                            return token;
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/php");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Token Generator</h2>
+    <p>Generate random tokens with the desired length and character set.</p>
+    <h3>Token Length</h3>
+    <p>Enter the desired length of the token.</p>
+    <h3>Character Set</h3>
+    <p>Select the character set to be used in the token.</p>
+    <ul>
+        <li>Uppercase (A-Z)</li>
+        <li>Lowercase (a-z)</li>
+        <li>Numbers (0-9)</li>
+        <li>Special (!@#$%^&amp;*)</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start">
+        <div class="col-2">
+            <form class="row g-3" id="tokenGeneratorForm" x-data="formHandler" @submit.prevent="submit()">
+                <div class="col-12">
+                    <label for="inputLength" class="form-label">Token Lenght</label>
+                    <input type="length" name="length" class="form-control" id="inputLength" placeholder="" value="12">
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="chars" value="uppercase" id="inputUppercase" checked>
+                        <label class="form-check-label" for="inputUppercase">
+                            Uppercase (A-Z)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="chars" value="lowercase" id="inputLowercase" checked>
+                        <label class="form-check-label" for="inputLowercase">
+                            Lowercace (a-z)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="chars" value="numbers" id="inputNumbers" checked>
+                        <label class="form-check-label" for="inputNumbers">
+                            Numbers (0-9)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="chars" value="special" id="inputSpecial">
+                        <label class="form-check-label" for="inputSpecial">
+                            Special (!@#$%^&amp;*)
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark">Generate</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-10">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

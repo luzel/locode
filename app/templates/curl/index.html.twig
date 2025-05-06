@@ -1,0 +1,190 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - cURL Generator{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-plain_text.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        url: '',
+                        method: 'GET',
+                        postData: '',
+                        verbose: false,
+                        info: false,
+                        selfSigned: false,
+                        followRedirects: false,
+                        outputToFile: false,
+                        outputFile: 'out.txt',
+                        enableAuth: false,
+                        authUser: '',
+                        authPass: '',
+                        generateCurl() {
+                            let url = this.url.trim();
+                            if (!url) {
+                                alert('Please enter a URL.');
+                                return;
+                            }
+
+                            // test if url starts with http or https
+                            if (!/^https?:\/\//.test(url)) {
+                                url = 'https://' + url;
+                            }
+
+                            let curlCommand = `curl -X ${this.method}`;
+                            if (this.verbose) curlCommand += ' -v';
+                            if (this.info) curlCommand += ' -I';
+                            if (this.selfSigned) curlCommand += ' -k';
+                            if (this.followRedirects) curlCommand += ' -L';
+                            curlCommand += ` "${url}"`;
+
+                            if (this.method === 'POST' && this.postData.trim()) {
+                                curlCommand += ` -d '${this.postData.trim()}'`;
+                            }
+
+                            if (this.outputToFile && this.outputFile.trim()) {
+                                curlCommand += ` -o "${this.outputFile.trim()}"`;
+                            }
+
+                            if (this.enableAuth && this.authUser.trim() && this.authPass.trim()) {
+                                curlCommand += ` -u "${this.authUser.trim()}:${this.authPass.trim()}"`;
+                            }
+
+                            App.editor_right.setValue(curlCommand, -1);
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/plain_text");
+                
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %}
+
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>cURL Generator</h2>
+    <p>Generate a cURL command with the desired URL, HTTP method, and optional POST data.</p>
+    <h3>URL</h3>
+    <p>Enter the URL for the cURL command.</p>
+    <h3>HTTP Method</h3>
+    <p>Select the HTTP method to use for the cURL command (e.g., GET, POST, PUT, DELETE).</p>
+    <h3>POST Data</h3>
+    <p>If the POST method is selected, enter the data to be sent in the request body.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="domTraversal">
+        <div class="col-3">
+            <form class="row g-3" id="curlGeneratorForm" @submit.prevent="generateCurl()">
+                <div class="col-12">
+                    <label for="inputUrl" class="form-label">URL</label>
+                    <input type="text" name="url" class="form-control" id="inputUrl" placeholder="e.g., https://api.example.com/resource" x-model="url">
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="enableAuth" x-model="enableAuth">
+                        <label class="form-check-label" for="enableAuth">Enable Basic Auth</label>
+                    </div>
+                    <div class="mt-2" x-show="enableAuth">
+                        <label for="authUser" class="form-label">Username</label>
+                        <input type="text" name="authUser" class="form-control" id="authUser" placeholder="e.g., user" x-model="authUser">
+                        <label for="authPass" class="form-label mt-2">Password</label>
+                        <input type="password" name="authPass" class="form-control" id="authPass" placeholder="e.g., password" x-model="authPass">
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label for="selectMethod" class="form-label">HTTP Method</label>
+                    <select name="method" class="form-select" id="selectMethod" x-model="method">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+                <div class="col-12" x-show="method === 'POST'">
+                    <label for="textareaPostData" class="form-label">POST Data</label>
+                    <textarea name="postData" class="form-control" id="textareaPostData" rows="4" placeholder="e.g., {'key':'value'}" x-model="postData"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Options</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="verbose" x-model="verbose">
+                        <label class="form-check-label" for="verbose">Verbose (-v)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="info" x-model="info">
+                        <label class="form-check-label" for="info">Fetch only HTTP headers (-I)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selfSigned" x-model="selfSigned">
+                        <label class="form-check-label" for="selfSigned">Ignore SSL certificate validation (-k)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="followRedirects" x-model="followRedirects">
+                        <label class="form-check-label" for="followRedirects">Follow Redirects (-L)</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="outputToFile" x-model="outputToFile">
+                        <label class="form-check-label" for="outputToFile">Output to File</label>
+                    </div>
+                    <div class="mt-2" x-show="outputToFile">
+                        <label for="outputFile" class="form-label">File Path</label>
+                        <input type="text" name="outputFile" class="form-control" id="outputFile" placeholder="e.g., /path/to/output.txt" x-model="outputFile">
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark">Generate</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-9">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

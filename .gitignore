@@ -1,0 +1,5 @@
+var/
+node_modules/
+vendor/
+.idea/
+.DS_Store

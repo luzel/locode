@@ -1,0 +1,218 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Crontab Generator{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-plain_text.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        crontabTime: '* * * * *',
+                        command: "su -s /bin/bash www-data -c 'wp cron event run --due-now --path=/var/www/html'",
+                        logOption: 'void',
+                        logPath: '/var/www/html/crontab.log',
+                        generateCrontab() {
+                            const command = this.command.trim();
+                            if (!command) {
+                                alert('Please enter a command.');
+                                return;
+                            }
+
+                            let crontabRecord = `${this.crontabTime} ${command}`;
+                            if (this.logOption === 'file') {
+                                const logPath = this.logPath.trim();
+                                if (!logPath) {
+                                    alert('Please enter a log file path.');
+                                    return;
+                                }
+                                crontabRecord += ` >> ${logPath} 2>&1`;
+                            } else if (this.logOption === 'void') {
+                                crontabRecord += ` > /dev/null 2>&1`;
+                            }
+
+                            App.editor_right.setValue(crontabRecord, -1);
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/plain_text");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %}
+
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Crontab Generator</h2>
+    <p>Generate a crontab record with the desired time format and command.</p>
+
+    <h3>Crontab Time</h3>
+    <p>Select the desired time format for the crontab record.</p>
+    <ul>
+        <li>Every Minute (* * * * *)</li>
+        <li>Every Hour (0 * * * *)</li>
+        <li>Every Day (0 0 * * *)</li>
+    </ul>
+
+    <h3>Command</h3>
+    <p>Enter the command to be executed by the crontab.</p>
+
+    <h3>Logging</h3>
+    <p>Select the logging option for the crontab record.</p>
+    <ul>
+        <li>No Logging (void)</li>
+        <li>Log to File</li>
+    </ul>
+
+    <h3>Log File Path</h3>
+    <p>If you selected "Log to File", enter the path to the log file.</p>
+
+    <h2>More on crontab</h2>
+    <p>Crontab is a Unix-based job scheduler that allows you to run scripts or commands at specified intervals. The syntax for crontab is as follows:</p>
+    <ul>
+        <li><strong>m</strong>: Minute (0-59)</li>
+        <li><strong>h</strong>: Hour (0-23)</li>
+        <li><strong>dom</strong>: Day of Month (1-31)</li>
+        <li><strong>mon</strong>: Month (1-12)</li>
+        <li><strong>dow</strong>: Day of Week (0-7) (Sunday is both 0 and 7)</li>
+    </ul>
+    <p>Each field can be a single number, a range (e.g., 1-5), a list (e.g., 1,2,3), or an asterisk (*) to represent "any".</p>
+    <p>For example, to run a script every day at 5 AM, you would use:</p>
+    <pre class="bg-dark"><code class="text-success">0 5 * * * /path/to/script.sh</code></pre>
+    <p>For more information, refer to the <a href="https://man7.org/linux/man5/crontab.5.html" target="_blank">crontab manual</a>.</p>
+    <h3>Example Crontab Entry</h3>
+
+    <p>To edit your crontab, use the following command:</p>
+    <pre class="bg-dark"><code class="text-success">crontab -e</code></pre>
+
+    <p>Here is an example of a crontab entry:</p>
+
+    <pre class="bg-dark"><code class="text-success">
+    # Edit this file to introduce tasks to be run by cron.
+    #
+    # Each task to run has to be defined through a single line
+    # indicating with different fields when the task will be run
+    # and what command to run for the task
+    #
+    # To define the time you can provide concrete values for
+    # minute (m), hour (h), day of month (dom), month (mon),
+    # and day of week (dow) or use '*' in these fields (for 'any').
+    #
+    # Notice that tasks will be started based on the cron's system
+    # daemon's notion of time and timezones.
+    #
+    # Output of the crontab jobs (including errors) is sent through
+    # email to the user the crontab file belongs to (unless redirected).
+    #
+    # For example, you can run a backup of all your user accounts
+    # at 5 a.m every week with:
+    # 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+    #
+    # For more information see the manual pages of crontab(5) and cron(8)
+    #
+    # m h  dom mon dow   command
+    0 5 * * * /usr/bin/php /path/to/script.php >> /var/log/cron.log 2>&1
+    </code></pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="domTraversal">
+        <div class="col-3">
+            <form class="row g-3" id="crontabGeneratorForm" @submit.prevent="generateCrontab()">
+                <div class="col-12">
+                    <label class="form-label">Crontab Time</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" value="* * * * *" id="everyMinute" x-model="crontabTime" checked>
+                        <label class="form-check-label" for="everyMinute">
+                            Every Minute (* * * * *)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" value="0 * * * *" id="everyHour" x-model="crontabTime">
+                        <label class="form-check-label" for="everyHour">
+                            Every Hour (0 * * * *)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" value="0 0 * * *" id="everyDay" x-model="crontabTime">
+                        <label class="form-check-label" for="everyDay">
+                            Every Day (0 0 * * *)
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label for="inputCommand" class="form-label">Command</label>
+                    <input type="text" name="command" class="form-control" id="inputCommand" placeholder="e.g., /usr/bin/php /path/to/script.php" value="" x-model="command">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Logging</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="logOption" value="void" id="logVoid" x-model="logOption" checked>
+                        <label class="form-check-label" for="logVoid">
+                            No Logging (void)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="logOption" value="file" id="logFile" x-model="logOption">
+                        <label class="form-check-label" for="logFile">
+                            Log to File
+                        </label>
+                    </div>
+                    <div class="mt-2" x-show="logOption === 'file'">
+                        <label for="inputLogPath" class="form-label">Log File Path</label>
+                        <input type="text" name="logPath" class="form-control" id="inputLogPath" placeholder="/path/to/logfile.log" x-model="logPath">
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark">Generate</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-9">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

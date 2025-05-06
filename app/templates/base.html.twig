@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{% block title %}loCode - loCode!{% endblock %}</title>
+        <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+
+        {% block stylesheets %}
+            {{ encore_entry_link_tags('app') }}
+        {% endblock %}
+
+        {% block javascripts %}
+            {{ encore_entry_script_tags('app') }}
+        {% endblock %}
+
+        {% block javascripts_head %}{% endblock %}
+        {% block stylesheets_head %}{% endblock %}
+    </head>
+    <body>
+
+    {% include 'nav.html.twig' %}
+
+    <div class="main">
+    {% block body %}{% endblock %}
+    <div>
+
+    <footer class="bg-light text-center text-lg-start mt-auto">
+        <div class="row">
+            <div class="col-4">
+                <p>© 2025 Luka Uzel — Open sourced under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+            </div>
+            <div class="col-4 text-center">
+                <p>loCode V1.0.0 built with ❤️ using Symfony, Alpine.js, Bootstrap and Docker</p>
+            </div>
+            <div class="col-4 text-end">
+                <p>{{ "now"|date("D. j F Y H:i") }}</p>
+            </div>
+        </div>
+    </footer>
+
+    {% block javascripts_footer %}{% endblock %}
+    {% block offcanvas %}{% endblock %}
+    </body>
+</html>

@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Hello HomeController!{% endblock %}
+
+{% block body %}
+<style>
+    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
+    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
+    .intro-text { display: flex; align-items: center; }
+    .intro-text img { max-width: 45%; margin: 0 2%; }
+    .intro-text div { max-width: 50%; }
+</style>
+
+<div class="example-wrapper">
+
+    <div class="container">
+        <h1>{{ title }}</h1>
+
+        <div class="row">
+            <div class="col-4">
+                <div class="card">
+                    <img src="{{ asset('images/DALLE_2025-03-11_23.53.36.webp') }}" class="card-img-top" alt="">
+                    <div class="card-body">
+                        <h5 class="card-title">Don't risk</h5>
+                        <p class="card-text">In today's digital age, the use of various tools is essential for efficient and secure work. However, it's important to be cautious about the tools you choose to use, especially online tools. While online tools can be convenient, they often come with significant risks.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="card">
+                    <img src="{{ asset('images/DALLE_2025-03-11_23.54.49.webp') }}" class="card-img-top" alt="">
+                    <div class="card-body">
+                        <h5 class="card-title">Trust no one</h5>
+                        <p class="card-text">Many online tools store your data on their servers, which can be accessed by unauthorized parties. This data can be used against you, leading to potential security breaches and privacy violations. Therefore, it's crucial to use trusted and secure tools that ensure your data remains private and protected.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="card">
+                    <img src="{{ asset('images/DALLE_2025-03-12_17.20.50.webp') }}" class="card-img-top" alt="">
+                    <div class="card-body">
+                        <h5 class="card-title">Go local</h5>
+                        <p class="card-text">By using locally hosted tools, you can have better control over your data and reduce the risk of it being compromised. Always prioritize security and privacy when selecting tools for your work.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

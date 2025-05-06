@@ -1,0 +1,21 @@
+services:
+  php:
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    container_name: symfony_php
+    working_dir: /var/www/html
+    volumes:
+      - ./app/:/var/www/html
+    ports:
+      - "5190:9000"
+    command: php-fpm
+
+  webserver:
+    image: caddy:latest
+    container_name: symfony_web
+    ports:
+      - "5180:80"
+    volumes:
+      - ./app/:/var/www/html
+      - ./server/Caddyfile:/etc/caddy/Caddyfile

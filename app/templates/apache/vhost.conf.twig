@@ -1,0 +1,46 @@
+<Directory {{ documentRoot }}>
+	Options FollowSymLinks
+	AllowOverride All
+	Require all granted
+</Directory>
+{% if preferences.http %}
+
+<VirtualHost {{bindIP}}:{{httpPort}}>
+    ServerName {{ serverName }}
+    {% if preferences.serverAlias %}ServerAlias {{ serverAlias }}{% endif %}
+
+    DocumentRoot {{ documentRoot }}
+
+	# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
+	# error, crit, alert, emerg.
+	LogLevel info
+
+    ErrorLog ${APACHE_LOG_DIR}{{ logName }}_error.log
+    CustomLog ${APACHE_LOG_DIR}{{ logName }}_access.log combined
+</VirtualHost>
+{% endif %}
+{% if preferences.https %}
+
+<IfModule mod_ssl.c>
+<VirtualHost {{bindIP}}:{{httpsPort}}>
+    ServerName {{ serverName }}
+    {% if preferences.serverAlias %}ServerAlias {{ serverAlias }}{% endif %}
+
+    DocumentRoot {{ documentRoot }}
+
+	#SSLEngine on
+    #SSLCertificateFile /etc/ssl/certs/your_domain.crt
+    #SSLCertificateKeyFile /etc/ssl/private/your_domain.key
+    #SSLCertificateChainFile /etc/ssl/certs/your_chain.pem
+	    
+	# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
+	# error, crit, alert, emerg.
+	# It is also possible to configure the loglevel for particular
+	# modules, e.g.
+	#LogLevel info ssl:warn
+
+    ErrorLog ${APACHE_LOG_DIR}{{ logName }}_error.log
+    CustomLog ${APACHE_LOG_DIR}{{ logName }}_access.log combined
+</VirtualHost>
+</IfModule>
+{% endif %}
