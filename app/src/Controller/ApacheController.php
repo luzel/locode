@@ -90,6 +90,17 @@ class ApacheController extends AbstractController
                     $to = parse_url($ex[3]);
                     $status = $ex[1];
 
+                    // check if from path has trailing slash
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                        $from['path'] .= '/?';
+                    }
+
+                    // remove leading slash from path
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                    }
+
                     if (!empty($from['query'])) {
                         $arr[] = "RewriteCond %{QUERY_STRING} ^" . $from['query'] . "$";
                         $arr[] = "RewriteRule ^" . $from['path'] . "$ " . rtrim($to['path'], '_') . "? [R=".$status.",L]";
@@ -105,6 +116,17 @@ class ApacheController extends AbstractController
                     $to = parse_url($ex[1]);
                     $status = $ex[2];
 
+                    // check if from path has trailing slash
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                        $from['path'] .= '/?';
+                    }
+
+                    // remove leading slash from path
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                    }
+
                     if (!empty($from['query'])) {
                         $arr[] = "RewriteCond %{QUERY_STRING} ^" . $from['query'] . "$";
                         $arr[] = "RewriteRule ^" . $from['path'] . "$ " . rtrim($to['path'], '_') . "? [R=".$status.",L]";
@@ -119,6 +141,17 @@ class ApacheController extends AbstractController
                     $from = parse_url($ex[0]);
                     $to = parse_url($ex[1]);
                     $status = '301';
+
+                    // check if from path has trailing slash
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                        $from['path'] .= '/?';
+                    }
+
+                    // remove leading slash from path
+                    if (substr($from['path'], -1) === '/') {
+                        $from['path'] = substr($from['path'], 0, -1);
+                    }
 
                     if (!empty($from['query'])) {
                         $arr[] = "RewriteCond %{QUERY_STRING} ^" . $from['query'] . "$";
