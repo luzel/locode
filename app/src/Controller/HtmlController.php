@@ -32,6 +32,17 @@ class HtmlController extends AbstractController {
 		);
 	}
 
+	#[Route( '/html/colors', name: 'app_html_colors' )]
+	public function colors(): Response {
+		return $this->render(
+			'html/colors.html.twig',
+			array(
+				'controller_name' => 'HtmlController',
+				'title'           => 'Color Converter',
+			)
+		);
+	}
+
 	#[Route( '/api/html/validate', name: 'api_html_validate', methods: array( 'POST' ) )]
 	public function apiValidate( Request $request ): JsonResponse {
 		try {

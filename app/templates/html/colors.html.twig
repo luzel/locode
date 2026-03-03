@@ -1,0 +1,415 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Color Converter{% endblock %}
+{% block javascripts_head %}
+    <script>
+        var App = {
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('colorConverter', () => ({
+                        sourceColor: '#FF5733',
+                        targetColor: '',
+                        targetFormat: 'rgb',
+                        detectedFormat: '',
+                        colorPreview: '#FF5733',
+                        
+                        init() {
+                            this.convert();
+                        },
+                        
+                        convert() {
+                            const color = this.sourceColor.trim();
+                            if (!color) {
+                                this.targetColor = '';
+                                return;
+                            }
+                            
+                            // Detect format
+                            const detected = this.detectFormat(color);
+                            this.detectedFormat = detected.format;
+                            
+                            if (!detected.valid) {
+                                this.targetColor = 'Invalid color format';
+                                return;
+                            }
+                            
+                            // Convert to RGB first (as intermediate format)
+                            let rgb = null;
+                            
+                            switch (detected.format) {
+                                case 'hex':
+                                    rgb = this.hexToRgb(color);
+                                    break;
+                                case 'rgb':
+                                case 'rgba':
+                                    rgb = detected.rgb;
+                                    break;
+                                case 'hsl':
+                                case 'hsla':
+                                    rgb = this.hslToRgb(detected.hsl.h, detected.hsl.s, detected.hsl.l);
+                                    break;
+                                case 'cmyk':
+                                    rgb = this.cmykToRgb(detected.cmyk.c, detected.cmyk.m, detected.cmyk.y, detected.cmyk.k);
+                                    break;
+                            }
+                            
+                            if (!rgb) {
+                                this.targetColor = 'Conversion failed';
+                                return;
+                            }
+                            
+                            // Update color preview
+                            this.colorPreview = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+                            
+                            // Convert to target format
+                            switch (this.targetFormat) {
+                                case 'hex':
+                                    this.targetColor = this.rgbToHex(rgb.r, rgb.g, rgb.b);
+                                    break;
+                                case 'rgb':
+                                    this.targetColor = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+                                    break;
+                                case 'rgba':
+                                    const alpha = detected.format === 'rgba' ? detected.rgb.a : 1;
+                                    this.targetColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+                                    break;
+                                case 'hsl':
+                                    const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+                                    this.targetColor = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+                                    break;
+                                case 'hsla':
+                                    const hsla = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+                                    const alphaHsl = detected.format === 'rgba' ? detected.rgb.a : 1;
+                                    this.targetColor = `hsla(${hsla.h}, ${hsla.s}%, ${hsla.l}%, ${alphaHsl})`;
+                                    break;
+                                case 'cmyk':
+                                    const cmyk = this.rgbToCmyk(rgb.r, rgb.g, rgb.b);
+                                    this.targetColor = `cmyk(${cmyk.c}%, ${cmyk.m}%, ${cmyk.y}%, ${cmyk.k}%)`;
+                                    break;
+                            }
+                        },
+                        
+                        detectFormat(color) {
+                            // Hex: #FFF or #FFFFFF
+                            if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(color)) {
+                                return { valid: true, format: 'hex' };
+                            }
+                            
+                            // RGB: rgb(255, 255, 255)
+                            const rgbMatch = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+                            if (rgbMatch) {
+                                return {
+                                    valid: true,
+                                    format: 'rgb',
+                                    rgb: { r: parseInt(rgbMatch[1]), g: parseInt(rgbMatch[2]), b: parseInt(rgbMatch[3]) }
+                                };
+                            }
+                            
+                            // RGBA: rgba(255, 255, 255, 0.5)
+                            const rgbaMatch = color.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/);
+                            if (rgbaMatch) {
+                                return {
+                                    valid: true,
+                                    format: 'rgba',
+                                    rgb: { r: parseInt(rgbaMatch[1]), g: parseInt(rgbaMatch[2]), b: parseInt(rgbaMatch[3]), a: parseFloat(rgbaMatch[4]) }
+                                };
+                            }
+                            
+                            // HSL: hsl(120, 100%, 50%)
+                            const hslMatch = color.match(/^hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)$/);
+                            if (hslMatch) {
+                                return {
+                                    valid: true,
+                                    format: 'hsl',
+                                    hsl: { h: parseInt(hslMatch[1]), s: parseInt(hslMatch[2]), l: parseInt(hslMatch[3]) }
+                                };
+                            }
+                            
+                            // HSLA: hsla(120, 100%, 50%, 0.5)
+                            const hslaMatch = color.match(/^hsla\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*,\s*([\d.]+)\s*\)$/);
+                            if (hslaMatch) {
+                                return {
+                                    valid: true,
+                                    format: 'hsla',
+                                    hsl: { h: parseInt(hslaMatch[1]), s: parseInt(hslaMatch[2]), l: parseInt(hslaMatch[3]), a: parseFloat(hslaMatch[4]) }
+                                };
+                            }
+                            
+                            // CMYK: cmyk(0%, 100%, 100%, 0%)
+                            const cmykMatch = color.match(/^cmyk\(\s*(\d+)%\s*,\s*(\d+)%\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)$/);
+                            if (cmykMatch) {
+                                return {
+                                    valid: true,
+                                    format: 'cmyk',
+                                    cmyk: { c: parseInt(cmykMatch[1]), m: parseInt(cmykMatch[2]), y: parseInt(cmykMatch[3]), k: parseInt(cmykMatch[4]) }
+                                };
+                            }
+                            
+                            return { valid: false, format: 'unknown' };
+                        },
+                        
+                        hexToRgb(hex) {
+                            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                            if (result) {
+                                return {
+                                    r: parseInt(result[1], 16),
+                                    g: parseInt(result[2], 16),
+                                    b: parseInt(result[3], 16)
+                                };
+                            }
+                            // Handle 3-digit hex
+                            const shortResult = /^#?([a-f\d])([a-f\d])([a-f\d])$/i.exec(hex);
+                            if (shortResult) {
+                                return {
+                                    r: parseInt(shortResult[1] + shortResult[1], 16),
+                                    g: parseInt(shortResult[2] + shortResult[2], 16),
+                                    b: parseInt(shortResult[3] + shortResult[3], 16)
+                                };
+                            }
+                            return null;
+                        },
+                        
+                        rgbToHex(r, g, b) {
+                            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+                        },
+                        
+                        rgbToHsl(r, g, b) {
+                            r /= 255;
+                            g /= 255;
+                            b /= 255;
+                            
+                            const max = Math.max(r, g, b);
+                            const min = Math.min(r, g, b);
+                            let h, s, l = (max + min) / 2;
+                            
+                            if (max === min) {
+                                h = s = 0;
+                            } else {
+                                const d = max - min;
+                                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                                
+                                switch (max) {
+                                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                                    case g: h = ((b - r) / d + 2) / 6; break;
+                                    case b: h = ((r - g) / d + 4) / 6; break;
+                                }
+                            }
+                            
+                            return {
+                                h: Math.round(h * 360),
+                                s: Math.round(s * 100),
+                                l: Math.round(l * 100)
+                            };
+                        },
+                        
+                        hslToRgb(h, s, l) {
+                            h /= 360;
+                            s /= 100;
+                            l /= 100;
+                            
+                            let r, g, b;
+                            
+                            if (s === 0) {
+                                r = g = b = l;
+                            } else {
+                                const hue2rgb = (p, q, t) => {
+                                    if (t < 0) t += 1;
+                                    if (t > 1) t -= 1;
+                                    if (t < 1/6) return p + (q - p) * 6 * t;
+                                    if (t < 1/2) return q;
+                                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                                    return p;
+                                };
+                                
+                                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                                const p = 2 * l - q;
+                                
+                                r = hue2rgb(p, q, h + 1/3);
+                                g = hue2rgb(p, q, h);
+                                b = hue2rgb(p, q, h - 1/3);
+                            }
+                            
+                            return {
+                                r: Math.round(r * 255),
+                                g: Math.round(g * 255),
+                                b: Math.round(b * 255)
+                            };
+                        },
+                        
+                        rgbToCmyk(r, g, b) {
+                            r /= 255;
+                            g /= 255;
+                            b /= 255;
+                            
+                            const k = 1 - Math.max(r, g, b);
+                            const c = k === 1 ? 0 : (1 - r - k) / (1 - k);
+                            const m = k === 1 ? 0 : (1 - g - k) / (1 - k);
+                            const y = k === 1 ? 0 : (1 - b - k) / (1 - k);
+                            
+                            return {
+                                c: Math.round(c * 100),
+                                m: Math.round(m * 100),
+                                y: Math.round(y * 100),
+                                k: Math.round(k * 100)
+                            };
+                        },
+                        
+                        cmykToRgb(c, m, y, k) {
+                            c /= 100;
+                            m /= 100;
+                            y /= 100;
+                            k /= 100;
+                            
+                            const r = 255 * (1 - c) * (1 - k);
+                            const g = 255 * (1 - m) * (1 - k);
+                            const b = 255 * (1 - y) * (1 - k);
+                            
+                            return {
+                                r: Math.round(r),
+                                g: Math.round(g),
+                                b: Math.round(b)
+                            };
+                        }
+                    }));
+                });
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .color-preview {
+            width: 100px;
+            height: 100px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            margin: 20px auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .format-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .converter-section {
+            background: rgba(0,0,0,0.05);
+            padding: 30px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Color Converter</h2>
+    <p>Convert colors between different formats with automatic source format detection.</p>
+    <h3>Supported Formats:</h3>
+    <ul>
+        <li><strong>HEX:</strong> #FF5733 or #F73</li>
+        <li><strong>RGB:</strong> rgb(255, 87, 51)</li>
+        <li><strong>RGBA:</strong> rgba(255, 87, 51, 0.5)</li>
+        <li><strong>HSL:</strong> hsl(9, 100%, 60%)</li>
+        <li><strong>HSLA:</strong> hsla(9, 100%, 60%, 0.5)</li>
+        <li><strong>CMYK:</strong> cmyk(0%, 66%, 80%, 0%)</li>
+    </ul>
+    <h3>Features:</h3>
+    <ul>
+        <li>Automatic source format detection</li>
+        <li>Real-time conversion</li>
+        <li>Color preview</li>
+        <li>Full precision conversion</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-center" x-data="colorConverter">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="converter-section">
+                <div class="row align-items-center">
+                    <div class="col-12 col-md-5">
+                        <div class="mb-3">
+                            <label for="sourceColor" class="form-label">
+                                Source Color
+                                <span x-show="detectedFormat" class="format-badge" x-text="detectedFormat"></span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control form-control-lg" 
+                                id="sourceColor" 
+                                x-model="sourceColor"
+                                @input="convert()"
+                                placeholder="#FF5733, rgb(255, 87, 51), etc.">
+                            <small class="form-text text-muted">Enter any color format</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-2 text-center">
+                        <div class="color-preview" :style="`background-color: ${colorPreview}`"></div>
+                        <div class="mb-3">
+                            <select class="form-select" x-model="targetFormat" @change="convert()">
+                                <option value="hex">HEX</option>
+                                <option value="rgb">RGB</option>
+                                <option value="rgba">RGBA</option>
+                                <option value="hsl">HSL</option>
+                                <option value="hsla">HSLA</option>
+                                <option value="cmyk">CMYK</option>
+                            </select>
+                            <small class="form-text text-muted">Output format</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-5">
+                        <div class="mb-3">
+                            <label for="targetColor" class="form-label">
+                                Converted Color
+                                <span class="format-badge" x-text="targetFormat.toUpperCase()"></span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control form-control-lg" 
+                                id="targetColor" 
+                                x-model="targetColor"
+                                readonly>
+                            <small class="form-text text-muted">
+                                <button @click="navigator.clipboard.writeText(targetColor)" class="btn btn-sm btn-outline-secondary mt-2">
+                                    <i class="bi bi-copy"></i> Copy to Clipboard
+                                </button>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h3>Quick Examples</h3>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" @click="sourceColor = '#FF5733'; convert();">Orange</button>
+                        <button type="button" class="btn btn-outline-primary" @click="sourceColor = 'rgb(46, 204, 113)'; convert();">Green</button>
+                        <button type="button" class="btn btn-outline-primary" @click="sourceColor = 'hsl(210, 100%, 50%)'; convert();">Blue</button>
+                        <button type="button" class="btn btn-outline-primary" @click="sourceColor = 'cmyk(100%, 0%, 0%, 0%)'; convert();">Cyan</button>
+                        <button type="button" class="btn btn-outline-primary" @click="sourceColor = 'rgba(231, 76, 60, 0.7)'; convert();">Red (Alpha)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
