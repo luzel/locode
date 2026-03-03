@@ -23,6 +23,8 @@
                         enableAuth: false,
                         authUser: '',
                         authPass: '',
+                        enableCookie: false,
+                        cookie: '',
                         generateCurl() {
                             let url = this.url.trim();
                             if (!url) {
@@ -52,6 +54,10 @@
 
                             if (this.enableAuth && this.authUser.trim() && this.authPass.trim()) {
                                 curlCommand += ` -u "${this.authUser.trim()}:${this.authPass.trim()}"`;
+                            }
+
+                            if (this.enableCookie && this.cookie.trim()) {
+                                curlCommand += ` -b "${this.cookie.trim()}"`;
                             }
 
                             App.editor_right.setValue(curlCommand, -1);
@@ -96,6 +102,8 @@
     <p>Select the HTTP method to use for the cURL command (e.g., GET, POST, PUT, DELETE).</p>
     <h3>POST Data</h3>
     <p>If the POST method is selected, enter the data to be sent in the request body.</p>
+    <h3>Cookies</h3>
+    <p>Enable and enter cookies to send with the request. Use format: <code>name=value</code> or <code>name1=value1; name2=value2</code></p>
   </div>
 </div>
 {% endblock %}
@@ -122,6 +130,17 @@
                         <input type="text" name="authUser" class="form-control" id="authUser" placeholder="e.g., user" x-model="authUser">
                         <label for="authPass" class="form-label mt-2">Password</label>
                         <input type="password" name="authPass" class="form-control" id="authPass" placeholder="e.g., password" x-model="authPass">
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="enableCookie" x-model="enableCookie">
+                        <label class="form-check-label" for="enableCookie">Send Cookie</label>
+                    </div>
+                    <div class="mt-2" x-show="enableCookie">
+                        <label for="cookie" class="form-label">Cookie</label>
+                        <input type="text" name="cookie" class="form-control" id="cookie" placeholder="e.g., session=abc123; token=xyz789" x-model="cookie">
+                        <small class="form-text text-muted">Format: name=value or name1=value1; name2=value2</small>
                     </div>
                 </div>
                 <div class="col-12">

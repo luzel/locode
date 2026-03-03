@@ -1,0 +1,260 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - SSH Key Generator{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-text.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            editor_private: null,
+            editor_public: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('sshGenerator', () => ({
+                        keyType: 'ed25519',
+                        keySize: 256,
+                        password: '',
+                        comment: 'generated-key@locode',
+                        isGenerating: false,
+                        keySizes: {
+                            'ed25519': [256],
+                            'rsa': [2048, 4096],
+                            'dsa': [1024],
+                            'ec': [256, 384, 521]
+                        },
+                        async generate() {
+                            this.isGenerating = true;
+                            
+                            try {
+                                const response = await fetch('/api/ssh/generate', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        keyType: this.keyType,
+                                        keySize: this.keySize,
+                                        password: this.password,
+                                        comment: this.comment
+                                    })
+                                });
+                                
+                                const data = await response.json();
+                                
+                                if (data.success) {
+                                    App.editor_private.setValue(data.privateKey, -1);
+                                    App.editor_public.setValue(data.publicKey, -1);
+                                } else {
+                                    alert(data.error || 'Key generation failed');
+                                }
+                            } catch (e) {
+                                alert("Error: " + e.message);
+                            } finally {
+                                this.isGenerating = false;
+                            }
+                        },
+                        updateKeySizes() {
+                            // Set default key size when algorithm changes
+                            if (this.keyType === 'ed25519') {
+                                this.keySize = 256;
+                            } else if (this.keyType === 'rsa') {
+                                this.keySize = 2048;
+                            } else if (this.keyType === 'dsa') {
+                                this.keySize = 1024;
+                            } else if (this.keyType === 'ec') {
+                                this.keySize = 256;
+                            }
+                        },
+                        getPrivateKeyFilename() {
+                            const map = {
+                                'ed25519': 'id_ed25519',
+                                'rsa': 'id_rsa',
+                                'dsa': 'id_dsa',
+                                'ec': 'id_ecdsa'
+                            };
+                            return map[this.keyType] || 'id_rsa';
+                        },
+                        getPublicKeyFilename() {
+                            return this.getPrivateKeyFilename() + '.pub';
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_private = ace.edit("editor_private");
+                this.editor_private.setTheme("ace/theme/monokai");
+                this.editor_private.session.setMode("ace/mode/text");
+                this.editor_private.setReadOnly(true);
+
+                const editor_private = document.getElementById("editor_private");
+                new ResizeObserver(() => {
+                    this.editor_private.resize();
+                }).observe(editor_private);
+
+                this.editor_public = ace.edit("editor_public");
+                this.editor_public.setTheme("ace/theme/monokai");
+                this.editor_public.session.setMode("ace/mode/text");
+                this.editor_public.setReadOnly(true);
+
+                const editor_public = document.getElementById("editor_public");
+                new ResizeObserver(() => {
+                    this.editor_public.resize();
+                }).observe(editor_public);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .ace-editor-half {
+            height: 300px;
+            width: 100%;
+            position: relative;
+            font-size: 14px;
+        }
+    </style>
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>SSH Key Generator</h2>
+    <p>Generate SSH key pairs for secure authentication. Keys are generated server-side using OpenSSL.</p>
+    <h3>Key Types:</h3>
+    <ul>
+        <li><strong>Ed25519:</strong> Modern, fast, secure (256 bits) - Recommended by GitHub</li>
+        <li><strong>RSA:</strong> Most widely supported (2048 or 4096 bits)</li>
+        <li><strong>DSA:</strong> Legacy, 1024 bits (not recommended for new keys)</li>
+        <li><strong>EC (Elliptic Curve):</strong> Modern, efficient (256, 384, or 521 bits)</li>
+    </ul>
+    <h3>Options:</h3>
+    <ul>
+        <li><strong>Password:</strong> Optional passphrase to encrypt the private key</li>
+        <li><strong>Comment:</strong> Identifier added to the public key</li>
+    </ul>
+    <h3>Usage:</h3>
+    <ol>
+        <li>Select key type and size</li>
+        <li>Optionally add password and comment</li>
+        <li>Click "Generate Keys"</li>
+        <li>Copy the private key to ~/.ssh/id_ed25519 (or ~/.ssh/id_rsa for RSA)</li>
+        <li>Copy the public key to authorized_keys on remote servers</li>
+        <li>Set proper permissions: <code>chmod 600 ~/.ssh/id_ed25519</code></li>
+    </ol>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="sshGenerator">
+        <div class="col-12 col-md-3">
+            <form class="row g-3" @submit.prevent="generate()">
+                <div class="col-12">
+                    <label for="keyType" class="form-label">Key Type</label>
+                    <select class="form-select" id="keyType" x-model="keyType" @change="updateKeySizes()">
+                        <option value="ed25519">Ed25519 (Recommended)</option>
+                        <option value="rsa">RSA</option>
+                        <option value="dsa">DSA (Legacy)</option>
+                        <option value="ec">EC (Elliptic Curve)</option>
+                    </select>
+                    <small class="form-text text-muted">Ed25519 is modern and secure (GitHub recommended)</small>
+                </div>
+                
+                <div class="col-12">
+                    <label for="keySize" class="form-label">Key Size (bits)</label>
+                    <select class="form-select" id="keySize" x-model="keySize">
+                        <template x-for="size in keySizes[keyType]" :key="size">
+                            <option :value="size" x-text="size"></option>
+                        </template>
+                    </select>
+                    <small class="form-text text-muted">Larger is more secure</small>
+                </div>
+                
+                <div class="col-12">
+                    <label for="password" class="form-label">Password (Optional)</label>
+                    <input 
+                        type="password" 
+                        class="form-control" 
+                        id="password" 
+                        x-model="password"
+                        placeholder="Leave empty for no password">
+                    <small class="form-text text-muted">Encrypts the private key</small>
+                </div>
+                
+                <div class="col-12">
+                    <label for="comment" class="form-label">Comment</label>
+                    <input 
+                        type="text" 
+                        class="form-control" 
+                        id="comment" 
+                        x-model="comment"
+                        placeholder="user@hostname">
+                    <small class="form-text text-muted">Identifier for the key</small>
+                </div>
+                
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark w-100" :disabled="isGenerating">
+                        <span x-show="!isGenerating"><i class="bi bi-key-fill"></i> Generate Keys</span>
+                        <span x-show="isGenerating"><i class="bi bi-hourglass-split"></i> Generating...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="col-12 col-md-9">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h3>Private Key <span class="badge bg-danger">Keep Secret!</span></h3>
+                    <div class="ace-toolbar">
+                        <button @click="AceToolbar.copyToClipboard('editor_private')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                            <i class="bi bi-copy"></i> Copy Private Key
+                        </button>
+                        <button @click="AceToolbar.toggleFullScreen('editor_private')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <div class="d-inline-block ms-2">
+                            <span class="text-muted small">Suggested filename:</span>
+                            <code x-text="getPrivateKeyFilename()"></code>
+                        </div>
+                    </div>
+                    <div class="ace-editor-half" id="editor_private"></div>
+                    <small class="form-text text-muted">Save this to ~/.ssh/<span x-text="getPrivateKeyFilename()"></span> with chmod 600</small>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <h3>Public Key <span class="badge bg-success">Safe to Share</span></h3>
+                    <div class="ace-toolbar">
+                        <button @click="AceToolbar.copyToClipboard('editor_public')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                            <i class="bi bi-copy"></i> Copy Public Key
+                        </button>
+                        <button @click="AceToolbar.toggleFullScreen('editor_public')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <div class="d-inline-block ms-2">
+                            <span class="text-muted small">Suggested filename:</span>
+                            <code x-text="getPublicKeyFilename()"></code>
+                        </div>
+                    </div>
+                    <div class="ace-editor-half" id="editor_public"></div>
+                    <small class="form-text text-muted">Add this to ~/.ssh/authorized_keys on remote servers</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

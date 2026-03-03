@@ -1,0 +1,384 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Rsync Command Generator{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-sh.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            editor: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('rsyncGenerator', () => ({
+                        sourceTransport: 'local',
+                        sourceUser: '',
+                        sourceHost: '',
+                        sourcePath: '/path/to/source/',
+                        sourceAlias: '',
+                        sourceModule: '',
+                        destTransport: 'ssh',
+                        destUser: '',
+                        destHost: '',
+                        destPath: '/path/to/destination/',
+                        destAlias: '',
+                        destModule: '',
+                        useConfigAlias: false,
+                        options: {
+                            archive: true,
+                            verbose: true,
+                            compress: true,
+                            delete: false,
+                            dryRun: false,
+                            progress: true,
+                            recursive: false,
+                            links: false,
+                            perms: false,
+                            times: false,
+                            group: false,
+                            owner: false,
+                            humanReadable: false
+                        },
+                        sshOptions: {
+                            useSSH: true,
+                            port: 22,
+                            identityFile: ''
+                        },
+                        excludePatterns: '',
+                        bandwidth: '',
+                        
+                        init() {
+                            this.generate();
+                        },
+                        
+                        generate() {
+                            let command = 'rsync';
+                            
+                            // Add options
+                            if (this.options.archive && !this.options.recursive) {
+                                command += ' -a';
+                            } else {
+                                if (this.options.recursive) command += ' -r';
+                                if (this.options.links) command += ' -l';
+                                if (this.options.perms) command += ' -p';
+                                if (this.options.times) command += ' -t';
+                                if (this.options.group) command += ' -g';
+                                if (this.options.owner) command += ' -o';
+                            }
+                            
+                            if (this.options.verbose) command += ' -v';
+                            if (this.options.compress) command += ' -z';
+                            if (this.options.delete) command += ' --delete';
+                            if (this.options.dryRun) command += ' --dry-run';
+                            if (this.options.progress) command += ' --progress';
+                            if (this.options.humanReadable) command += ' -h';
+                            
+                            // SSH options (only if SSH transport is used)
+                            const usingSsh = this.sourceTransport === 'ssh' || this.destTransport === 'ssh';
+                            if (usingSsh && this.sshOptions.useSSH) {
+                                let sshCmd = '-e "ssh';
+                                if (this.sshOptions.port && this.sshOptions.port !== 22) {
+                                    sshCmd += ' -p ' + this.sshOptions.port;
+                                }
+                                if (this.sshOptions.identityFile) {
+                                    sshCmd += ' -i ' + this.sshOptions.identityFile;
+                                }
+                                sshCmd += '"';
+                                command += ' ' + sshCmd;
+                            }
+                            
+                            // Bandwidth limit
+                            if (this.bandwidth) {
+                                command += ' --bwlimit=' + this.bandwidth;
+                            }
+                            
+                            // Exclude patterns
+                            if (this.excludePatterns) {
+                                const patterns = this.excludePatterns.split('\n').filter(p => p.trim());
+                                patterns.forEach(pattern => {
+                                    command += ' --exclude="' + pattern.trim() + '"';
+                                });
+                            }
+                            
+                            // Build source and destination
+                            let source = this.buildPath('source');
+                            let dest = this.buildPath('dest');
+                            
+                            command += ' ' + source + ' ' + dest;
+                            
+                            App.editor.setValue(command, -1);
+                        },
+                        
+                        buildPath(type) {
+                            const transport = type === 'source' ? this.sourceTransport : this.destTransport;
+                            const user = type === 'source' ? this.sourceUser : this.destUser;
+                            const host = type === 'source' ? this.sourceHost : this.destHost;
+                            const path = type === 'source' ? this.sourcePath : this.destPath;
+                            const alias = type === 'source' ? this.sourceAlias : this.destAlias;
+                            const module = type === 'source' ? this.sourceModule : this.destModule;
+                            
+                            if (transport === 'local') {
+                                return path;
+                            } else if (transport === 'ssh') {
+                                let result = '';
+                                if (this.useConfigAlias && alias) {
+                                    result = alias + ':' + path;
+                                } else {
+                                    if (user) result += user + '@';
+                                    if (host) result += host + ':';
+                                    result += path;
+                                }
+                                return result;
+                            } else if (transport === 'rsync') {
+                                // rsync daemon: rsync://[user@]host[:port]/module/path
+                                let result = 'rsync://';
+                                if (user) result += user + '@';
+                                result += host;
+                                if (module) result += '/' + module;
+                                if (path && path !== '/') result += path;
+                                return result;
+                            }
+                            return path;
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor = ace.edit("editor");
+                this.editor.setTheme("ace/theme/monokai");
+                this.editor.session.setMode("ace/mode/sh");
+                this.editor.setReadOnly(true);
+
+                const editor = document.getElementById("editor");
+                new ResizeObserver(() => {
+                    this.editor.resize();
+                }).observe(editor);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Rsync Command Generator</h2>
+    <p>Generate rsync commands for file synchronization and backup with flexible transport options.</p>
+    <h3>Common Options:</h3>
+    <ul>
+        <li><strong>-a (archive):</strong> Preserves permissions, times, symlinks, etc.</li>
+        <li><strong>-v (verbose):</strong> Shows detailed output</li>
+        <li><strong>-z (compress):</strong> Compresses data during transfer</li>
+        <li><strong>--delete:</strong> Deletes files in destination not in source</li>
+        <li><strong>--dry-run:</strong> Shows what would be transferred without doing it</li>
+        <li><strong>--progress:</strong> Shows transfer progress</li>
+    </ul>
+    <h3>Transport Methods:</h3>
+    <ul>
+        <li><strong>Local:</strong> Direct filesystem access</li>
+        <li><strong>SSH:</strong> Secure shell transfer (default for remote)</li>
+        <li><strong>Rsync Daemon:</strong> rsync:// protocol (requires rsync daemon on remote server)</li>
+    </ul>
+    <h3>SSH Config Alias:</h3>
+    <p>Enable this option to use host aliases from your <code>~/.ssh/config</code> file instead of specifying user@host manually.</p>
+    <p>Example SSH config:</p>
+    <pre>Host myserver
+    HostName example.com
+    User myuser
+    Port 2222
+    IdentityFile ~/.ssh/id_rsa</pre>
+    <p>Then use just <code>myserver</code> as the alias in the form.</p>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="rsyncGenerator">
+        <div class="col-12 col-md-4">
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="useConfigAlias" x-model="useConfigAlias" @change="generate()">
+                    <label class="form-check-label" for="useConfigAlias">
+                        Use SSH Config Alias <small class="text-muted">(~/.ssh/config)</small>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-12">
+                    <h5>Source</h5>
+                    <label for="sourceTransport" class="form-label">Transport</label>
+                    <select class="form-select form-select-sm mb-2" id="sourceTransport" x-model="sourceTransport" @change="generate()">
+                        <option value="local">Local Filesystem</option>
+                        <option value="ssh">SSH</option>
+                        <option value="rsync">Rsync Daemon</option>
+                    </select>
+                    
+                    <div x-show="sourceTransport === 'ssh'">
+                        <div x-show="useConfigAlias">
+                            <input type="text" class="form-control form-control-sm mb-2" x-model="sourceAlias" @input="generate()" placeholder="host-alias">
+                            <small class="form-text text-muted">SSH Config Alias</small>
+                        </div>
+                        <div x-show="!useConfigAlias">
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" x-model="sourceUser" @input="generate()" placeholder="user">
+                                    <small class="form-text text-muted">User</small>
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" x-model="sourceHost" @input="generate()" placeholder="hostname">
+                                    <small class="form-text text-muted">Host</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div x-show="sourceTransport === 'rsync'">
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="sourceUser" @input="generate()" placeholder="user (optional)">
+                                <small class="form-text text-muted">User</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="sourceHost" @input="generate()" placeholder="hostname">
+                                <small class="form-text text-muted">Host</small>
+                            </div>
+                        </div>
+                        <input type="text" class="form-control form-control-sm mb-2" x-model="sourceModule" @input="generate()" placeholder="module">
+                        <small class="form-text text-muted">Module Name</small>
+                    </div>
+                    
+                    <input type="text" class="form-control mt-2" x-model="sourcePath" @input="generate()" placeholder="/path/to/source/">
+                    <small class="form-text text-muted">Path</small>
+                </div>
+                
+                <div class="col-12">
+                    <h5>Destination</h5>
+                    <label for="destTransport" class="form-label">Transport</label>
+                    <select class="form-select form-select-sm mb-2" id="destTransport" x-model="destTransport" @change="generate()">
+                        <option value="local">Local Filesystem</option>
+                        <option value="ssh">SSH</option>
+                        <option value="rsync">Rsync Daemon</option>
+                    </select>
+                    
+                    <div x-show="destTransport === 'ssh'">
+                        <div x-show="useConfigAlias">
+                            <input type="text" class="form-control form-control-sm mb-2" x-model="destAlias" @input="generate()" placeholder="host-alias">
+                            <small class="form-text text-muted">SSH Config Alias</small>
+                        </div>
+                        <div x-show="!useConfigAlias">
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" x-model="destUser" @input="generate()" placeholder="user">
+                                    <small class="form-text text-muted">User</small>
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" x-model="destHost" @input="generate()" placeholder="hostname">
+                                    <small class="form-text text-muted">Host</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div x-show="destTransport === 'rsync'">
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="destUser" @input="generate()" placeholder="user (optional)">
+                                <small class="form-text text-muted">User</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="destHost" @input="generate()" placeholder="hostname">
+                                <small class="form-text text-muted">Host</small>
+                            </div>
+                        </div>
+                        <input type="text" class="form-control form-control-sm mb-2" x-model="destModule" @input="generate()" placeholder="module">
+                        <small class="form-text text-muted">Module Name</small>
+                    </div>
+                    
+                    <input type="text" class="form-control mt-2" x-model="destPath" @input="generate()" placeholder="/path/to/destination/">
+                    <small class="form-text text-muted">Path</small>
+                </div>
+                
+                <div class="col-12">
+                    <h5>Options</h5>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optArchive" x-model="options.archive" @change="generate()">
+                        <label class="form-check-label" for="optArchive">-a (Archive mode)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optVerbose" x-model="options.verbose" @change="generate()">
+                        <label class="form-check-label" for="optVerbose">-v (Verbose)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optCompress" x-model="options.compress" @change="generate()">
+                        <label class="form-check-label" for="optCompress">-z (Compress)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optProgress" x-model="options.progress" @change="generate()">
+                        <label class="form-check-label" for="optProgress">--progress (Show progress)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optDelete" x-model="options.delete" @change="generate()">
+                        <label class="form-check-label text-danger" for="optDelete">--delete (Delete extra files)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optDryRun" x-model="options.dryRun" @change="generate()">
+                        <label class="form-check-label" for="optDryRun">--dry-run (Test mode)</label>
+                    </div>
+                </div>
+                
+                <div class="col-12" x-show="sourceTransport === 'ssh' || destTransport === 'ssh'">
+                    <h5>SSH Options</h5>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="useSSH" x-model="sshOptions.useSSH" @change="generate()">
+                        <label class="form-check-label" for="useSSH">Customize SSH Options</label>
+                    </div>
+                    <div x-show="sshOptions.useSSH">
+                        <input type="number" class="form-control form-control-sm mb-2" x-model="sshOptions.port" @input="generate()" placeholder="22">
+                        <small class="form-text text-muted">SSH Port</small>
+                        <input type="text" class="form-control form-control-sm mt-2" x-model="sshOptions.identityFile" @input="generate()" placeholder="~/.ssh/id_ed25519">
+                        <small class="form-text text-muted">Identity File</small>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <label for="excludePatterns" class="form-label">Exclude Patterns (one per line)</label>
+                    <textarea class="form-control" id="excludePatterns" rows="3" x-model="excludePatterns" @input="generate()" placeholder="*.log 
+                    node_modules/ 
+                    .git/"></textarea>
+                </div>
+                
+                <div class="col-12">
+                    <label for="bandwidth" class="form-label">Bandwidth Limit (KB/s)</label>
+                    <input type="number" class="form-control" id="bandwidth" x-model="bandwidth" @input="generate()" placeholder="1000">
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-md-8">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.copyToClipboard('editor')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i> Copy Command
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -40,12 +40,13 @@
                     <a class="nav-link {% if app.request.attributes.get('_route') == 'app_curl' %}active{% endif %}" href="{{ path('app_curl') }}">cURL</a>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle {% if app.request.attributes.get('_route') in ['app_html_validator', 'app_html_formatter', 'app_html_colors'] %}active{% endif %}" href="{{ path('app_html_validator') }}" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle {% if app.request.attributes.get('_route') in ['app_ssh_generate', 'app_ssh_rsync', 'app_ssh_tunnel'] %}active{% endif %}" href="{{ path('app_ssh_generate') }}" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         SSH
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_html_validator' %}active{% endif %}" href="{{ path('app_html_validator') }}">Generate</a></li>
-                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_html_validator' %}active{% endif %}" href="{{ path('app_html_validator') }}">Rsync</a></li>
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_ssh_generate' %}active{% endif %}" href="{{ path('app_ssh_generate') }}">Generate Keys</a></li>
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_ssh_rsync' %}active{% endif %}" href="{{ path('app_ssh_rsync') }}">Rsync</a></li>
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_ssh_tunnel' %}active{% endif %}" href="{{ path('app_ssh_tunnel') }}">Tunnel</a></li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown">
