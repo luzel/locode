@@ -11,10 +11,13 @@
 - **URL Parsing** – Break down URLs into components for easy analysis.  
 - **JSON Formatter** – Pretty-print and validate JSON data.  
 - **JWT Decoder** – Decode JWT tokens.  
-- **Crontab** – Crontab generator.  
-- **cURL** – cURL command generator.  
-- **Token Generator** – Generate passwords or tokens.  
-- **Apache** – Redirections, VirtualHost generator.
+- **Crontab Generator** – Create crontab expressions with ease.  
+- **cURL Command Generator** – Build cURL commands with headers, authentication, and cookies.  
+- **Token Generator** – Generate secure passwords and random tokens.  
+- **SSH Tools** – Generate SSH keys (Ed25519, RSA, DSA, EC), build rsync commands, create SSH tunnels.  
+- **HTTP Tools** – Analyze HAR files, encode/decode HTTP cookies.  
+- **HTML Tools** – Validate HTML5 documents, format/beautify HTML, convert colors (HEX/RGB/HSL/CMYK).  
+- **Apache Utilities** – Generate redirections, VirtualHost configs, BasicAuth .htpasswd files.  
 - **And More…** – Expanding toolset for developers’ daily needs.  
 
 ## 🔒 Why Self-Host?  
@@ -93,8 +96,9 @@ services:
   **Solution**: Verify Node.js and npm versions meet the requirements.  
 
 ## 📌 Roadmap  
-- HTML5 document validation  
-- HEX,RGB converter  
+- Additional network diagnostic tools  
+- Database query formatters  
+- Regular expression tester  
 - Improved UI/UX
 
 ## 🤝 Contribute
