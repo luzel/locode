@@ -1,0 +1,565 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - HAR Viewer{% endblock %}
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-json.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+
+        var App = {
+            localStorageKey: 'locode_har_content',
+            editor: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('harViewer', () => ({
+                        harData: null,
+                        entries: [],
+                        summary: null,
+                        selectedEntry: null,
+                        filterText: '',
+                        filterMethod: 'all',
+                        filterType: 'all',
+                        sortBy: 'index',
+                        sortOrder: 'asc',
+                        
+                        parseHar() {
+                            try {
+                                const content = ace.edit('editor').getValue();
+                                localStorage.setItem('locode_har_content', content);
+                                const data = JSON.parse(content);
+                                
+                                if (!data.log || !data.log.entries) {
+                                    alert('Invalid HAR file: missing log.entries');
+                                    return;
+                                }
+                                
+                                this.harData = data.log;
+                                this.processEntries();
+                                this.calculateSummary();
+                            } catch (e) {
+                                alert('Error parsing HAR: ' + e.message);
+                            }
+                        },
+                        
+                        processEntries() {
+                            this.entries = this.harData.entries.map((entry, index) => {
+                                const url = new URL(entry.request.url);
+                                return {
+                                    index: index + 1,
+                                    method: entry.request.method,
+                                    url: entry.request.url,
+                                    hostname: url.hostname,
+                                    pathname: url.pathname,
+                                    status: entry.response.status,
+                                    statusText: entry.response.statusText,
+                                    type: entry._resourceType || this.getResourceType(entry),
+                                    size: entry.response.content.size || 0,
+                                    time: Math.round(entry.time),
+                                    serverIP: entry.serverIPAddress || '-',
+                                    requestHeaders: entry.request.headers,
+                                    responseHeaders: entry.response.headers,
+                                    timings: entry.timings,
+                                    raw: entry
+                                };
+                            });
+                        },
+                        
+                        calculateSummary() {
+                            const totalRequests = this.entries.length;
+                            const totalSize = this.entries.reduce((sum, e) => sum + e.size, 0);
+                            const totalTime = this.entries.reduce((sum, e) => sum + e.time, 0);
+                            const failedRequests = this.entries.filter(e => e.status >= 400).length;
+                            
+                            const types = {};
+                            this.entries.forEach(e => {
+                                types[e.type] = (types[e.type] || 0) + 1;
+                            });
+                            
+                            const methods = {};
+                            this.entries.forEach(e => {
+                                methods[e.method] = (methods[e.method] || 0) + 1;
+                            });
+                            
+                            this.summary = {
+                                totalRequests,
+                                totalSize,
+                                totalTime,
+                                failedRequests,
+                                successRate: ((totalRequests - failedRequests) / totalRequests * 100).toFixed(1),
+                                types,
+                                methods,
+                                pageUrl: this.harData.pages?.[0]?.title || 'N/A'
+                            };
+                        },
+                        
+                        getResourceType(entry) {
+                            const contentType = entry.response.content.mimeType || '';
+                            if (contentType.includes('javascript')) return 'script';
+                            if (contentType.includes('css')) return 'stylesheet';
+                            if (contentType.includes('image')) return 'image';
+                            if (contentType.includes('font')) return 'font';
+                            if (contentType.includes('html')) return 'document';
+                            return 'other';
+                        },
+                        
+                        get filteredEntries() {
+                            let filtered = this.entries;
+                            
+                            if (this.filterText) {
+                                const text = this.filterText.toLowerCase();
+                                filtered = filtered.filter(e => 
+                                    e.url.toLowerCase().includes(text) ||
+                                    e.hostname.toLowerCase().includes(text)
+                                );
+                            }
+                            
+                            if (this.filterMethod !== 'all') {
+                                filtered = filtered.filter(e => e.method === this.filterMethod);
+                            }
+                            
+                            if (this.filterType !== 'all') {
+                                filtered = filtered.filter(e => e.type === this.filterType);
+                            }
+                            
+                            return this.sortEntries(filtered);
+                        },
+                        
+                        sortEntries(entries) {
+                            return [...entries].sort((a, b) => {
+                                let aVal = a[this.sortBy];
+                                let bVal = b[this.sortBy];
+                                
+                                if (typeof aVal === 'string') {
+                                    aVal = aVal.toLowerCase();
+                                    bVal = bVal.toLowerCase();
+                                }
+                                
+                                if (this.sortOrder === 'asc') {
+                                    return aVal > bVal ? 1 : -1;
+                                } else {
+                                    return aVal < bVal ? 1 : -1;
+                                }
+                            });
+                        },
+                        
+                        setSortBy(field) {
+                            if (this.sortBy === field) {
+                                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                this.sortBy = field;
+                                this.sortOrder = 'asc';
+                            }
+                        },
+                        
+                        formatBytes(bytes) {
+                            if (bytes === 0) return '0 B';
+                            const k = 1024;
+                            const sizes = ['B', 'KB', 'MB', 'GB'];
+                            const i = Math.floor(Math.log(bytes) / Math.log(k));
+                            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+                        },
+                        
+                        getStatusClass(status) {
+                            if (status >= 200 && status < 300) return 'success';
+                            if (status >= 300 && status < 400) return 'warning';
+                            if (status >= 400) return 'danger';
+                            return 'secondary';
+                        },
+                        
+                        getTypeIcon(type) {
+                            const icons = {
+                                document: 'file-earmark-text',
+                                script: 'file-earmark-code',
+                                stylesheet: 'file-earmark-richtext',
+                                image: 'file-earmark-image',
+                                font: 'file-earmark-font',
+                                other: 'file-earmark'
+                            };
+                            return icons[type] || 'file-earmark';
+                        },
+                        
+                        viewDetails(entry) {
+                            this.selectedEntry = entry;
+                        },
+                        
+                        closeDetails() {
+                            this.selectedEntry = null;
+                        },
+                        
+                        exportFiltered() {
+                            const filtered = this.filteredEntries;
+                            const csv = this.entriesToCSV(filtered);
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'har-export.csv';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        },
+                        
+                        entriesToCSV(entries) {
+                            const headers = ['Index', 'Method', 'URL', 'Status', 'Type', 'Size', 'Time (ms)'];
+                            const rows = entries.map(e => [
+                                e.index,
+                                e.method,
+                                `"${e.url.replace(/"/g, '""')}"`,
+                                e.status,
+                                e.type,
+                                e.size,
+                                e.time
+                            ]);
+                            return [headers, ...rows].map(row => row.join(',')).join('\n');
+                        }
+                    }));
+                });
+                
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            
+            initAce() {
+                this.editor = ace.edit("editor");
+                this.editor.setTheme("ace/theme/monokai");
+                this.editor.session.setMode("ace/mode/json");
+                this.editor.getSession().setUseWrapMode(true);
+
+                const editor = document.getElementById("editor");
+                new ResizeObserver(() => {
+                    this.editor.resize();
+                }).observe(editor);
+
+                let value = localStorage.getItem(App.localStorageKey) || "";
+                this.editor.setValue(value, -1);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .har-summary {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #999;
+            margin-top: 5px;
+        }
+        .requests-table {
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .requests-table table {
+            margin: 0;
+        }
+        .requests-table th {
+            background: #2d2d2d;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .requests-table th:hover {
+            background: #3d3d3d;
+        }
+        .requests-table tbody tr {
+            cursor: pointer;
+        }
+        .requests-table tbody tr:hover {
+            background: #2d2d2d;
+        }
+        .truncate {
+            max-width: 400px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .modal-lg {
+            max-width: 90%;
+        }
+        .detail-section {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .header-list {
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .filters {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>HAR Viewer</h2>
+    <p>The HAR (HTTP Archive) viewer allows you to analyze network traffic captured from browser developer tools.</p>
+    
+    <h3>How to Export HAR</h3>
+    <ol>
+        <li>Open browser DevTools (F12)</li>
+        <li>Go to Network tab</li>
+        <li>Reload the page</li>
+        <li>Right-click → "Save all as HAR with content"</li>
+    </ol>
+    
+    <h3>Features</h3>
+    <ul>
+        <li><strong>Summary:</strong> View total requests, size, timing, and success rate</li>
+        <li><strong>Filter:</strong> Search by URL or filter by method/type</li>
+        <li><strong>Sort:</strong> Click column headers to sort</li>
+        <li><strong>Details:</strong> Click any request to view headers and timings</li>
+        <li><strong>Export:</strong> Export filtered data as CSV</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid" x-data="harViewer">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.saveContent('editor', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+                <button @click="parseHar" class="btn btn-sm btn-primary">
+                    <i class="bi bi-play-fill"></i> Parse HAR
+                </button>
+            </div>
+            <div class="ace-editor" id="editor" style="height: 300px;"></div>
+        </div>
+    </div>
+    
+    <template x-if="summary">
+        <div>
+            <!-- Summary -->
+            <div class="har-summary">
+                <h3 class="mb-3">Summary</h3>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-value" x-text="summary.totalRequests"></div>
+                            <div class="stat-label">Total Requests</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-value" x-text="formatBytes(summary.totalSize)"></div>
+                            <div class="stat-label">Total Size</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-value" x-text="summary.totalTime + ' ms'"></div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-value" :class="summary.failedRequests > 0 ? 'text-danger' : 'text-success'" x-text="summary.successRate + '%'"></div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <small class="text-muted"><strong>Page:</strong> <span x-text="summary.pageUrl"></span></small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <div class="filters">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Search URL</label>
+                        <input type="text" class="form-control" x-model="filterText" placeholder="Filter by URL or hostname...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Method</label>
+                        <select class="form-select" x-model="filterMethod">
+                            <option value="all">All Methods</option>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="OPTIONS">OPTIONS</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" x-model="filterType">
+                            <option value="all">All Types</option>
+                            <option value="document">Document</option>
+                            <option value="script">Script</option>
+                            <option value="stylesheet">Stylesheet</option>
+                            <option value="image">Image</option>
+                            <option value="font">Font</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="badge bg-secondary" x-text="filteredEntries.length + ' / ' + entries.length"></span>
+                    </div>
+                    <div class="col-md-2">
+                        <button @click="exportFiltered" class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Requests Table -->
+            <div class="requests-table">
+                <table class="table table-dark table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th @click="setSortBy('index')" style="width: 60px;">#</th>
+                            <th @click="setSortBy('method')" style="width: 80px;">Method</th>
+                            <th @click="setSortBy('url')">URL</th>
+                            <th @click="setSortBy('status')" style="width: 80px;">Status</th>
+                            <th @click="setSortBy('type')" style="width: 120px;">Type</th>
+                            <th @click="setSortBy('size')" style="width: 100px;">Size</th>
+                            <th @click="setSortBy('time')" style="width: 100px;">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="entry in filteredEntries" :key="entry.index">
+                            <tr @click="viewDetails(entry)" data-bs-toggle="modal" data-bs-target="#detailsModal">
+                                <td x-text="entry.index"></td>
+                                <td><span class="badge bg-info" x-text="entry.method"></span></td>
+                                <td>
+                                    <div class="truncate" :title="entry.url">
+                                        <i class="bi" :class="'bi-' + getTypeIcon(entry.type)"></i>
+                                        <span x-text="entry.pathname"></span>
+                                    </div>
+                                    <small class="text-muted" x-text="entry.hostname"></small>
+                                </td>
+                                <td><span class="badge" :class="'bg-' + getStatusClass(entry.status)" x-text="entry.status"></span></td>
+                                <td x-text="entry.type"></td>
+                                <td x-text="formatBytes(entry.size)"></td>
+                                <td x-text="entry.time + ' ms'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+    
+    <template x-if="!summary">
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle"></i> Paste your HAR JSON content above and click "Parse HAR" to analyze the network traffic.
+        </div>
+    </template>
+    
+    <!-- Details Modal -->
+    <div class="modal fade" id="detailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content bg-dark text-light">
+                <template x-if="selectedEntry">
+                    <div>
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <span class="badge" :class="'bg-' + getStatusClass(selectedEntry.status)" x-text="selectedEntry.method + ' ' + selectedEntry.status"></span>
+                                <span class="ms-2" x-text="selectedEntry.pathname"></span>
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="detail-section">
+                                <h6><i class="bi bi-info-circle"></i> General</h6>
+                                <table class="table table-sm table-dark">
+                                    <tr><td><strong>URL:</strong></td><td><small x-text="selectedEntry.url"></small></td></tr>
+                                    <tr><td><strong>Method:</strong></td><td x-text="selectedEntry.method"></td></tr>
+                                    <tr><td><strong>Status:</strong></td><td x-text="selectedEntry.status + ' ' + selectedEntry.statusText"></td></tr>
+                                    <tr><td><strong>Type:</strong></td><td x-text="selectedEntry.type"></td></tr>
+                                    <tr><td><strong>Size:</strong></td><td x-text="formatBytes(selectedEntry.size)"></td></tr>
+                                    <tr><td><strong>Time:</strong></td><td x-text="selectedEntry.time + ' ms'"></td></tr>
+                                    <tr><td><strong>Server IP:</strong></td><td x-text="selectedEntry.serverIP"></td></tr>
+                                </table>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h6><i class="bi bi-clock-history"></i> Timings</h6>
+                                <table class="table table-sm table-dark">
+                                    <template x-if="selectedEntry.timings">
+                                        <tbody>
+                                            <tr><td><strong>Blocked:</strong></td><td x-text="Math.round(selectedEntry.timings.blocked) + ' ms'"></td></tr>
+                                            <tr><td><strong>DNS:</strong></td><td x-text="Math.round(selectedEntry.timings.dns) + ' ms'"></td></tr>
+                                            <tr><td><strong>Connect:</strong></td><td x-text="Math.round(selectedEntry.timings.connect) + ' ms'"></td></tr>
+                                            <tr><td><strong>Send:</strong></td><td x-text="Math.round(selectedEntry.timings.send) + ' ms'"></td></tr>
+                                            <tr><td><strong>Wait:</strong></td><td x-text="Math.round(selectedEntry.timings.wait) + ' ms'"></td></tr>
+                                            <tr><td><strong>Receive:</strong></td><td x-text="Math.round(selectedEntry.timings.receive) + ' ms'"></td></tr>
+                                        </tbody>
+                                    </template>
+                                </table>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h6><i class="bi bi-arrow-up"></i> Request Headers</h6>
+                                <div class="header-list">
+                                    <template x-for="header in selectedEntry.requestHeaders" :key="header.name">
+                                        <div><strong x-text="header.name + ':'"></strong> <span x-text="header.value"></span></div>
+                                    </template>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h6><i class="bi bi-arrow-down"></i> Response Headers</h6>
+                                <div class="header-list">
+                                    <template x-for="header in selectedEntry.responseHeaders" :key="header.name">
+                                        <div><strong x-text="header.name + ':'"></strong> <span x-text="header.value"></span></div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
