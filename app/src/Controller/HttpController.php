@@ -18,4 +18,15 @@ final class HttpController extends AbstractController {
 			)
 		);
 	}
+
+	#[Route( '/http/cookie', name: 'app_http_cookie' )]
+	public function cookie(): Response {
+		return $this->render(
+			'http/cookie.html.twig',
+			array(
+				'controller_name' => 'HttpController',
+				'title'           => 'Cookie Encoder/Decoder',
+			)
+		);
+	}
 }

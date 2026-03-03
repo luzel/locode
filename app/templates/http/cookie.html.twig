@@ -1,0 +1,208 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Cookie Encoder/Decoder{% endblock %}
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-plain_text.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+
+        var App = {
+            localStorageKey: 'locode_cookie_left_content',
+            editor_left: null,
+            editor_right: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('cookieTool', () => ({
+                        mode: 'decode', // decode or encode
+                        
+                        process() {
+                            let left_content = ace.edit('editor_left').getValue();
+                            let right_editor = ace.edit('editor_right');
+                            
+                            try {
+                                localStorage.setItem('locode_cookie_left_content', left_content);
+                                let result = '';
+                                
+                                if (this.mode === 'decode') {
+                                    result = this.decodeCookie(left_content);
+                                } else {
+                                    result = this.encodeCookie(left_content);
+                                }
+                                
+                                right_editor.setValue(result, -1);
+                            } catch (e) {
+                                alert("Error: " + e.message);
+                            }
+                        },
+                        
+                        decodeCookie(cookieString) {
+                            // Parse cookie string (key=value; key2=value2) to key-value pairs (one per line)
+                            if (!cookieString.trim()) {
+                                return '';
+                            }
+                            
+                            const pairs = cookieString.split(';').map(pair => pair.trim()).filter(pair => pair);
+                            return pairs.join('\n');
+                        },
+                        
+                        encodeCookie(keyValuePairs) {
+                            // Parse key-value pairs (one per line) to cookie string
+                            if (!keyValuePairs.trim()) {
+                                return '';
+                            }
+                            
+                            const lines = keyValuePairs.split('\n')
+                                .map(line => line.trim())
+                                .filter(line => line);
+                            
+                            return lines.join('; ');
+                        },
+                        
+                        toggleMode() {
+                            // Swap mode and content
+                            this.mode = this.mode === 'decode' ? 'encode' : 'decode';
+                            
+                            const leftEditor = ace.edit('editor_left');
+                            const rightEditor = ace.edit('editor_right');
+                            
+                            const leftContent = leftEditor.getValue();
+                            const rightContent = rightEditor.getValue();
+                            
+                            leftEditor.setValue(rightContent, -1);
+                            rightEditor.setValue(leftContent, -1);
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_left = ace.edit("editor_left");
+                this.editor_left.setTheme("ace/theme/monokai");
+                this.editor_left.session.setMode("ace/mode/plain_text");
+                this.editor_left.getSession().setUseWrapMode(true);
+
+                const editor_left = document.getElementById("editor_left");
+                new ResizeObserver(() => {
+                    this.editor_left.resize();
+                }).observe(editor_left);
+
+                let value = localStorage.getItem(App.localStorageKey) || "";
+                this.editor_left.setValue(value, -1);
+
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/plain_text");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Cookie Encoder/Decoder</h2>
+    <p>Convert between HTTP Cookie header strings and key-value pairs.</p>
+    
+    <h3>Decode Mode</h3>
+    <p>Converts a cookie string to key-value pairs (one per line):</p>
+    <p><strong>Input:</strong></p>
+    <pre>tt_viewer=5dd6a32b; obuid=09906436; tt_exelate=</pre>
+    <p><strong>Output:</strong></p>
+    <pre>tt_viewer=5dd6a32b
+obuid=09906436
+tt_exelate=</pre>
+    
+    <h3>Encode Mode</h3>
+    <p>Converts key-value pairs to a cookie string for HTTP Cookie header:</p>
+    <p><strong>Input:</strong></p>
+    <pre>tt_viewer=5dd6a32b
+obuid=09906436
+tt_exelate=</pre>
+    <p><strong>Output:</strong></p>
+    <pre>tt_viewer=5dd6a32b; obuid=09906436; tt_exelate=</pre>
+    
+    <h3>Usage</h3>
+    <ul>
+        <li>Select mode (Decode or Encode)</li>
+        <li>Paste your content in the left editor</li>
+        <li>Click the arrow button to convert</li>
+        <li>Use the swap button to reverse direction and content</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="cookieTool">
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <span class="badge bg-secondary" x-text="mode === 'decode' ? 'Cookie String' : 'Key-Value Pairs'"></span>
+                <button @click="AceToolbar.saveContent('editor_left', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_left')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_left"></div>
+        </div>
+        <div class="col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2 d-flex flex-column justify-content-center">
+            <div class="mb-3">
+                <label class="form-label">Mode</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="mode" id="decode" value="decode" x-model="mode" checked>
+                    <label class="btn btn-outline-primary" for="decode">Decode</label>
+                    
+                    <input type="radio" class="btn-check" name="mode" id="encode" value="encode" x-model="mode">
+                    <label class="btn btn-outline-primary" for="encode">Encode</label>
+                </div>
+            </div>
+            <button @click="process" class="btn btn-dark w-100 mb-2">
+                <span x-show="mode === 'decode'">Decode <i class="bi bi-arrow-right-square"></i></span>
+                <span x-show="mode === 'encode'">Encode <i class="bi bi-arrow-right-square"></i></span>
+            </button>
+            <button @click="toggleMode" class="btn btn-outline-secondary w-100" title="Swap direction and content">
+                <i class="bi bi-arrow-left-right"></i> Swap
+            </button>
+        </div>
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <span class="badge bg-success" x-text="mode === 'decode' ? 'Key-Value Pairs' : 'Cookie String'"></span>
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

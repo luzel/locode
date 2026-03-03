@@ -7,7 +7,6 @@
     <script>
 
         var App = {
-            localStorageKey: 'locode_har_content',
             editor: null,
             init() {
                 document.addEventListener('alpine:init', () => {
@@ -25,7 +24,6 @@
                         parseHar() {
                             try {
                                 const content = ace.edit('editor').getValue();
-                                localStorage.setItem('locode_har_content', content);
                                 const data = JSON.parse(content);
                                 
                                 if (!data.log || !data.log.entries) {
@@ -229,9 +227,6 @@
                 new ResizeObserver(() => {
                     this.editor.resize();
                 }).observe(editor);
-
-                let value = localStorage.getItem(App.localStorageKey) || "";
-                this.editor.setValue(value, -1);
             }
         }
         App.init();
@@ -349,11 +344,8 @@
     </div>
     
     <div class="row mb-3">
-        <div class="col-12">
+        <div class="col-10 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
             <div class="ace-toolbar">
-                <button @click="AceToolbar.saveContent('editor', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
-                    <i class="bi bi-floppy"></i>
-                </button>
                 <button @click="AceToolbar.copyToClipboard('editor')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
                     <i class="bi bi-copy"></i>
                 </button>
