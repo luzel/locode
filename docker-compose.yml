@@ -3,7 +3,7 @@ services:
     build:
       context: ./
       dockerfile: ./server/Dockerfile
-    container_name: symfony_php
+    container_name: locode_php
     working_dir: /var/www/html
     volumes:
       - ./app/:/var/www/html
@@ -13,7 +13,7 @@ services:
 
   webserver:
     image: caddy:latest
-    container_name: symfony_web
+    container_name: locode_web
     ports:
       - "5180:80"
     volumes:
