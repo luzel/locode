@@ -40,6 +40,15 @@
                     <a class="nav-link {% if app.request.attributes.get('_route') == 'app_curl' %}active{% endif %}" href="{{ path('app_curl') }}">cURL</a>
                 </li>
                 <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {% if app.request.attributes.get('_route') in ['app_html_validator', 'app_html_formatter'] %}active{% endif %}" href="{{ path('app_html_validator') }}" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        HTML
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_html_validator' %}active{% endif %}" href="{{ path('app_html_validator') }}">Validator</a></li>
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_html_formatter' %}active{% endif %}" href="{{ path('app_html_formatter') }}">Formatter</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {% if app.request.attributes.get('_route') in ['app_php', 'app_php_serialize'] %}active{% endif %}" href="{{ path('app_php_serialize') }}" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         PHP
                     </a>

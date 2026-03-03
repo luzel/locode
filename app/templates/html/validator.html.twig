@@ -1,0 +1,197 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - HTML Validator{% endblock %}
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-html.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            localStorageKey: 'locode_html_validator_content',
+            editor: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('htmlValidator', () => ({
+                        validationResult: null,
+                        isValidating: false,
+                        async validate() {
+                            this.isValidating = true;
+                            let content = ace.edit('editor').getValue();
+                            
+                            try {
+                                localStorage.setItem(App.localStorageKey, content);
+                                
+                                const response = await fetch('/api/html/validate', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'text/html'
+                                    },
+                                    body: content
+                                });
+                                
+                                const data = await response.json();
+                                
+                                if (data.success) {
+                                    this.validationResult = data;
+                                } else {
+                                    alert(data.error || 'Validation failed');
+                                }
+                            } catch (e) {
+                                alert("Validation error: " + e.message);
+                            } finally {
+                                this.isValidating = false;
+                            }
+                        },
+                        getLevelClass(level) {
+                            if (level === 3) return 'text-danger'; // Fatal/Error
+                            if (level === 2) return 'text-warning'; // Warning
+                            return 'text-info'; // Notice
+                        },
+                        getLevelText(level) {
+                            if (level === 3) return 'Error';
+                            if (level === 2) return 'Warning';
+                            return 'Notice';
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor = ace.edit("editor");
+                this.editor.setTheme("ace/theme/monokai");
+                this.editor.session.setMode("ace/mode/html");
+                this.editor.getSession().setUseWrapMode(true);
+
+                const editor = document.getElementById("editor");
+                new ResizeObserver(() => {
+                    this.editor.resize();
+                }).observe(editor);
+
+                let value = localStorage.getItem(App.localStorageKey) || `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+</body>
+</html>`;
+                this.editor.setValue(value, -1);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .validation-results {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .error-item {
+            padding: 8px;
+            margin-bottom: 4px;
+            border-left: 3px solid;
+            background-color: rgba(0,0,0,0.1);
+        }
+        .error-item.error {
+            border-left-color: #dc3545;
+        }
+        .error-item.warning {
+            border-left-color: #ffc107;
+        }
+    </style>
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>HTML Validator</h2>
+    <p>Enter your HTML code in the editor and click "Validate" to check for syntax errors and warnings.</p>
+    <h3>Features:</h3>
+    <ul>
+        <li>Syntax validation using PHP DOMDocument</li>
+        <li>Line and column error reporting</li>
+        <li>Warning and error categorization</li>
+        <li>Auto-save to localStorage</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="htmlValidator">
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="mb-3">
+                <button @click="validate()" class="btn btn-primary" :disabled="isValidating">
+                    <span x-show="!isValidating"><i class="bi bi-check-circle"></i> Validate</span>
+                    <span x-show="isValidating"><i class="bi bi-hourglass-split"></i> Validating...</span>
+                </button>
+            </div>
+            
+            <div x-show="validationResult" class="validation-results">
+                <div class="alert" :class="validationResult?.valid ? 'alert-success' : 'alert-danger'">
+                    <h4 x-show="validationResult?.valid">✓ HTML is valid!</h4>
+                    <h4 x-show="!validationResult?.valid">✗ HTML has errors</h4>
+                    <p class="mb-0">
+                        <strong>Errors:</strong> <span x-text="validationResult?.errorCount || 0"></span> |
+                        <strong>Warnings:</strong> <span x-text="validationResult?.warningCount || 0"></span>
+                    </p>
+                </div>
+                
+                <div x-show="validationResult?.errors?.length > 0" class="mb-3">
+                    <h5 class="text-danger">Errors:</h5>
+                    <template x-for="error in validationResult?.errors" :key="error.line + '-' + error.column">
+                        <div class="error-item error">
+                            <strong :class="getLevelClass(error.level)">
+                                <span x-text="getLevelText(error.level)"></span> at line <span x-text="error.line"></span>, column <span x-text="error.column"></span>:
+                            </strong>
+                            <div x-text="error.message"></div>
+                        </div>
+                    </template>
+                </div>
+                
+                <div x-show="validationResult?.warnings?.length > 0">
+                    <h5 class="text-warning">Warnings:</h5>
+                    <template x-for="warning in validationResult?.warnings" :key="warning.line + '-' + warning.column">
+                        <div class="error-item warning">
+                            <strong :class="getLevelClass(warning.level)">
+                                <span x-text="getLevelText(warning.level)"></span> at line <span x-text="warning.line"></span>, column <span x-text="warning.column"></span>:
+                            </strong>
+                            <div x-text="warning.message"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-7 col-md-7 col-lg-7 col-xl-7 col-xxl-7">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.saveContent('editor', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

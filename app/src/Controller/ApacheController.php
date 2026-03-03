@@ -108,85 +108,54 @@ class ApacheController extends AbstractController {
 			$arr   = array();
 
 			foreach ( $lines as $line ) {
+				$line = trim( $line );
+				if ( empty( $line ) ) {
+					continue;
+				}
+
 				$ex = explode( ' ', $line );
 
 				if ( count( $ex ) === 4 ) {
-					// Redirect 301 /_SHOP/files/products/5010010001561.jpg?id=8169535 /
-					$from   = parse_url( $ex[2] );
-					$to     = parse_url( $ex[3] );
-					$status = $ex[1];
+					// Redirect 301 /old-path /new-path
+					$from      = parse_url( $ex[2] );
+					$toUrl     = $ex[3];
+					$status    = $ex[1];
+					$fromPath  = $this->processFromPath( $from );
+					$queryRule = $this->processQuery( $from );
 
-					// check if from path has trailing slash
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path']  = substr( $from['path'], 0, -1 );
-						$from['path'] .= '/?';
+					if ( $queryRule ) {
+						$arr[] = $queryRule;
 					}
-
-					// remove leading slash from path
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path'] = substr( $from['path'], 0, -1 );
-					}
-
-					if ( ! empty( $from['query'] ) ) {
-						$arr[] = 'RewriteCond %{QUERY_STRING} ^' . $from['query'] . '$';
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					} else {
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					}
+					$arr[] = 'RewriteRule ^' . $fromPath . '$ ' . $toUrl . '? [R=' . $status . ',L]';
+					$arr[] = '';
 				} elseif ( count( $ex ) === 3 ) {
-					// /_SHOP/files/products/5010010001561.jpg?id=8169535 / 301
-					$from   = parse_url( $ex[0] );
-					$to     = parse_url( $ex[1] );
-					$status = $ex[2];
+					// /old-path /new-path 301
+					$from      = parse_url( $ex[0] );
+					$toUrl     = $ex[1];
+					$status    = $ex[2];
+					$fromPath  = $this->processFromPath( $from );
+					$queryRule = $this->processQuery( $from );
 
-					// check if from path has trailing slash
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path']  = substr( $from['path'], 0, -1 );
-						$from['path'] .= '/?';
+					if ( $queryRule ) {
+						$arr[] = $queryRule;
 					}
-
-					// remove leading slash from path
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path'] = substr( $from['path'], 0, -1 );
-					}
-
-					if ( ! empty( $from['query'] ) ) {
-						$arr[] = 'RewriteCond %{QUERY_STRING} ^' . $from['query'] . '$';
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					} else {
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					}
+					$arr[] = 'RewriteRule ^' . $fromPath . '$ ' . $toUrl . '? [R=' . $status . ',L]';
+					$arr[] = '';
 				} elseif ( count( $ex ) === 2 ) {
-					// /_SHOP/files/products/5010010001561.jpg?id=8169535 /
-					$from   = parse_url( $ex[0] );
-					$to     = parse_url( $ex[1] );
-					$status = '301';
+					// /old-path /new-path (defaults to 301)
+					$from      = parse_url( $ex[0] );
+					$toUrl     = $ex[1];
+					$status    = '301';
+					$fromPath  = $this->processFromPath( $from );
+					$queryRule = $this->processQuery( $from );
 
-					// check if from path has trailing slash
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path']  = substr( $from['path'], 0, -1 );
-						$from['path'] .= '/?';
+					if ( $queryRule ) {
+						$arr[] = $queryRule;
 					}
-
-					// remove leading slash from path
-					if ( substr( $from['path'], -1 ) === '/' ) {
-						$from['path'] = substr( $from['path'], 0, -1 );
-					}
-
-					if ( ! empty( $from['query'] ) ) {
-						$arr[] = 'RewriteCond %{QUERY_STRING} ^' . $from['query'] . '$';
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					} else {
-						$arr[] = 'RewriteRule ^' . $from['path'] . '$ ' . rtrim( $to['path'], '_' ) . '? [R=' . $status . ',L]';
-						$arr[] = '';
-					}
+					$arr[] = 'RewriteRule ^' . $fromPath . '$ ' . $toUrl . '? [R=' . $status . ',L]';
+					$arr[] = '';
 				} else {
-					$arr[] = 'Unknown format for line: ' . $line;
+					$arr[] = '# Unknown format for line: ' . $line;
 				}
 			}
 
@@ -320,5 +289,33 @@ class ApacheController extends AbstractController {
 		);
 
 		return '$apr1$' . $salt . '$' . $tmp;
+	}
+
+	/**
+	 * Process the 'from' path for RewriteRule regex pattern
+	 */
+	private function processFromPath( array $from ): string {
+		$path = $from['path'] ?? '';
+
+		// Remove leading slash (Apache RewriteRule patterns don't include it)
+		if ( substr( $path, 0, 1 ) === '/' ) {
+			$path = substr( $path, 1 );
+		}
+
+		// Escape special regex characters (not including forward slash)
+		$path = preg_replace( '/([.\-+*?^${}()|[\]\\\\])/', '\\\\$1', $path );
+
+		// Add end anchor
+		return $path . '$';
+	}
+
+	/**
+	 * Process query string for RewriteCond if present
+	 */
+	private function processQuery( array $from ): ?string {
+		if ( ! empty( $from['query'] ) ) {
+			return 'RewriteCond %{QUERY_STRING} ^' . preg_quote( $from['query'], '/' ) . '$';
+		}
+		return null;
 	}
 }
