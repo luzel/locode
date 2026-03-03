@@ -55,6 +55,7 @@
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_apache_redirections' %}active{% endif %}" href="{{ path('app_apache_redirections') }}">Redirections</a></li>
                         <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_apache_vhost' %}active{% endif %}" href="{{ path('app_apache_vhost') }}">VirtualHost</a></li>
+                        <li><a class="dropdown-item {% if app.request.attributes.get('_route') == 'app_apache_basicauth' %}active{% endif %}" href="{{ path('app_apache_basicauth') }}">BasicAuth</a></li>
                     </ul>
                 </li>
             </ul>

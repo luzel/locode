@@ -1,0 +1,209 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - BasicAuth{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-apache_conf.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            editor_htaccess: null,
+            editor_htpasswd: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('basicAuthForm', () => ({
+                        currentHtaccessName: '.htaccess',
+                        currentHtpasswdName: '.htpasswd',
+                        submit() {
+                            const formData = this.getFormData(this.$event.target);
+                            fetch('/api/apache/basicauth', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify( formData )
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    App.editor_htaccess.setValue(data.htaccess, -1);
+                                    App.editor_htpasswd.setValue(data.htpasswd, -1);
+                                } else {
+                                    alert(data.message);
+                                }
+                            })
+                            .catch(error => {
+                                alert('Error: ' + error.message);
+                            });
+                        },
+                        getFormData(form) {
+                            let data = {};
+                            new FormData(form).forEach((value, key) => {
+                                if (data[key]) {
+                                    if (Array.isArray(data[key])) {
+                                        data[key].push(value);
+                                    } else {
+                                        data[key] = [data[key], value];
+                                    }
+                                } else {
+                                    data[key] = value;
+                                }
+                            });
+                            return data;
+                        },
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_htaccess = ace.edit("editor_htaccess");
+                this.editor_htaccess.setTheme("ace/theme/monokai");
+                this.editor_htaccess.session.setMode("ace/mode/apache_conf");
+
+                this.editor_htpasswd = ace.edit("editor_htpasswd");
+                this.editor_htpasswd.setTheme("ace/theme/monokai");
+                this.editor_htpasswd.session.setMode("ace/mode/text");
+
+                const editor_htaccess = document.getElementById("editor_htaccess");
+                new ResizeObserver(() => {
+                    this.editor_htaccess.resize();
+                }).observe(editor_htaccess);
+
+                const editor_htpasswd = document.getElementById("editor_htpasswd");
+                new ResizeObserver(() => {
+                    this.editor_htpasswd.resize();
+                }).observe(editor_htpasswd);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        .ace-editor-half {
+            height: 400px;
+            width: 100%;
+            position: relative;
+            font-size: 14px;
+        }
+    </style>
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Basic Authentication Generator</h2>
+    <p>This tool helps you generate Apache Basic Authentication configuration. Fill in the form to create both the .htaccess snippet and .htpasswd file content.</p>
+    <h3>Fields:</h3>
+    <ul>
+        <li><strong>Path to .htpasswd:</strong> The absolute server path where the .htpasswd file will be located (e.g., /var/www/html/.htpasswd)</li>
+        <li><strong>Username:</strong> The username for basic authentication</li>
+        <li><strong>Password:</strong> The password that will be encrypted using Apache's APR1-MD5 algorithm</li>
+        <li><strong>Auth Realm:</strong> The authentication realm message shown to users</li>
+    </ul>
+    <h3>Additional Options:</h3>
+    <ul>
+        <li><strong>Allow Images:</strong> Allow image files to bypass authentication (useful for email clients)</li>
+        <li><strong>Allow Localhost:</strong> Allow access from localhost without authentication</li>
+        <li><strong>Allow Crawlers:</strong> Allow specific search engine crawlers to bypass authentication</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="basicAuthForm">
+        <div class="col-2">
+            <form class="row g-3" id="basicAuthForm" @submit.prevent="submit()">
+                <div class="col-12">
+                    <label for="inputHtpasswdPath" class="form-label">Path to .htpasswd</label>
+                    <input type="text" name="htpasswdPath" class="form-control" id="inputHtpasswdPath" placeholder="/var/www/html/.htpasswd" value="/var/www/html/.htpasswd" required>
+                    <small class="form-text text-muted">Absolute server path</small>
+                </div>
+                <div class="col-12">
+                    <label for="inputUsername" class="form-label">Username</label>
+                    <input type="text" name="username" class="form-control" id="inputUsername" placeholder="admin" value="admin" required>
+                </div>
+                <div class="col-12">
+                    <label for="inputPassword" class="form-label">Password</label>
+                    <input type="text" name="password" class="form-control" id="inputPassword" placeholder="password" value="" required>
+                    <small class="form-text text-muted">Will be encrypted</small>
+                </div>
+                <div class="col-12">
+                    <label for="inputAuthName" class="form-label">Auth Realm</label>
+                    <input type="text" name="authName" class="form-control" id="inputAuthName" placeholder="Authorization required" value="Authorization required">
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="allowImages" value="1" id="inputAllowImages">
+                        <label class="form-check-label" for="inputAllowImages">
+                            Allow Images
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="allowLocalhost" value="1" id="inputAllowLocalhost">
+                        <label class="form-check-label" for="inputAllowLocalhost">
+                            Allow Localhost
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="allowCrawlers" value="1" id="inputAllowCrawlers">
+                        <label class="form-check-label" for="inputAllowCrawlers">
+                            Allow Crawlers
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-dark">Generate</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-10">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h3>.htaccess</h3>
+                    <div class="ace-toolbar">
+                        <button @click="AceToolbar.toggleFullScreen('editor_htaccess')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <button @click="AceToolbar.copyToClipboard('editor_htaccess')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                        <div class="d-inline-block">
+                            <input type="text" class="form-control form-control-sm" x-model="currentHtaccessName">
+                        </div>
+                    </div>
+                    <div class="ace-editor-half" id="editor_htaccess"></div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <h3>.htpasswd</h3>
+                    <div class="ace-toolbar">
+                        <button @click="AceToolbar.toggleFullScreen('editor_htpasswd')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                        <button @click="AceToolbar.copyToClipboard('editor_htpasswd')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                        <div class="d-inline-block">
+                            <input type="text" class="form-control form-control-sm" x-model="currentHtpasswdName">
+                        </div>
+                    </div>
+                    <div class="ace-editor-half" id="editor_htpasswd"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
