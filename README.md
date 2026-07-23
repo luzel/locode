@@ -45,6 +45,28 @@ You can quickly deploy **loCode** using Docker.
 
 The `locode-notes` volume stores Markdown files created in **Notes** outside the container. Keep this volume mounted when recreating or upgrading the container so your notes persist.
 
+### Updating the Docker image
+
+Pull the latest image, remove the existing container, and recreate it with the same volume:
+
+```sh
+docker pull ghcr.io/luzel/locode:latest
+docker rm -f locode
+docker run -d --name locode \
+  -p 5180:80 \
+  -v locode-notes:/app/notes \
+  ghcr.io/luzel/locode:latest
+```
+
+The `locode-notes` volume is not removed when the container is deleted, so existing notes remain available after the upgrade.
+If the original container used `APP_SECRET` or other environment variables, include the same `-e` options when recreating it.
+
+To remove old, untagged image layers after verifying the updated container:
+
+```sh
+docker image prune -f
+```
+
 To keep a stable Symfony secret between restarts, pass `APP_SECRET`:
 
 ```sh
