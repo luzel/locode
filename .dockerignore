@@ -1,0 +1,12 @@
+.git/
+.github/
+docker-compose.yml
+copy-to-public.sh
+docs/
+app/.env.dev
+app/.env.local
+app/.env.*.local
+app/node_modules/
+app/vendor/
+app/var/
+npm-debug.log

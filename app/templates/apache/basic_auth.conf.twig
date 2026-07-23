@@ -1,0 +1,38 @@
+ErrorDocument 401 "{{ authName }}"
+
+# BEGIN Basic Auth
+RewriteEngine On
+{% if allowImages %}
+
+# Allow image requests to bypass auth (for email clients)
+RewriteCond %{REQUEST_URI} \.(gif|jpg|jpeg|png|webp|svg|ico|bmp)$ [NC]
+RewriteRule ^ - [E=NOAUTH:1]
+{% endif %}
+{% if allowCrawlers %}
+
+# Set allowed crawlers
+SetEnvIfNoCase User-Agent ^FacebookExternalHit NOAUTH=1
+SetEnvIfNoCase User-Agent ^IntegrityLinkChecker NOAUTH=1
+{% endif %}
+{% if allowUrls and allowUrlList|length > 0 %}
+
+# Allow specific URLs to bypass auth
+{% for url in allowUrlList %}
+SetEnvIf Request_URI "^{{ url|replace({'/': '\/'}) }}" NOAUTH=1
+{% endfor %}
+{% endif %}
+
+AuthUserFile {{ htpasswdPath }}
+AuthName "{{ authName }}"
+AuthType Basic
+Order deny,allow
+Deny from all
+Require valid-user
+{% if allowImages or allowCrawlers or (allowUrls and allowUrlList|length > 0) %}
+Allow from env=NOAUTH
+{% endif %}
+{% if allowLocalhost %}
+Allow from 127.0.0.0/24
+{% endif %}
+Satisfy Any
+# END Basic Auth

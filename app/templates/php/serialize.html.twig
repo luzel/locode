@@ -1,0 +1,177 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Serialize{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-php.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            localStorageKey: 'locode_php_serialize_left_content',
+            localStorageKey2: 'locode_php_serialize_right_content',
+            editor_left: null,
+            editor_right: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        serialize() {
+                            let left_content = App.editor_left.getValue();
+                            localStorage.setItem(App.localStorageKey, left_content);
+
+                            fetch('/api/php/serialize', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: btoa( left_content )
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    App.editor_right.setValue(data.formatted, -1);
+                                } else {
+                                    alert(data.message);
+                                }
+                            })
+                            .catch(error => {
+                                alert('Error: ' + error.message);
+                            });
+                        },
+                        unserialize() {
+                            let right_content = App.editor_right.getValue();
+                            localStorage.setItem(App.localStorageKey2, right_content);
+
+                            fetch('/api/php/unserialize', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: right_content
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    App.editor_left.setValue(data.formatted, -1);
+                                } else {
+                                    alert(data.message);
+                                }
+                            })
+                            .catch(error => {
+                                alert('Error: ' + error.message);
+                            });
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_left = ace.edit("editor_left");
+                this.editor_left.setTheme("ace/theme/monokai");
+                this.editor_left.session.setMode("ace/mode/php");
+                this.editor_left.getSession().setUseWrapMode(true);
+
+                const editor_left = document.getElementById("editor_left");
+                new ResizeObserver(() => {
+                    this.editor_left.resize();
+                }).observe(editor_left);
+
+                let value = localStorage.getItem(App.localStorageKey) || `<?php`;
+                this.editor_left.setValue(value, -1);
+
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/plain_text");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+
+                let value2 = localStorage.getItem(App.localStorageKey2) || '';
+                this.editor_right.setValue(value2, -1);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+
+    <h2>Usage</h2>
+    
+    <p>On left side goes PHP code.</p>
+    
+    <pre class="bg-dark"><code class="text-success">
+    &lt;?php
+    (object) [
+        'name' => 'John Doe',
+        'age' => 30,
+        'city' => 'Zagreb'
+    ];
+    </code></pre>
+
+    <p>On right side goes PHP serialized string.</p>
+
+    <pre class="bg-dark"><code class="text-success">
+    O:8:"stdClass":3:{s:4:"name";s:8:"John Doe";s:3:"age";i:30;s:4:"city";s:6:"Zagreb";}
+    </code></pre>
+
+
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="domTraversal">
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.saveContent('editor_left', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_left')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_left"></div>
+        </div>
+        <div class="col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2 d-flex flex-column justify-content-center">
+            <button @click="serialize" class="btn btn-dark mb-1">Serialize <i class="bi bi-arrow-right-square"></i></button>
+            <button @click="unserialize" class="btn btn-dark mb-1"><i class="bi bi-arrow-left-square"></i> Unserialize</button>
+        </div>
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

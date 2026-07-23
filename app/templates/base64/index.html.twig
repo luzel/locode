@@ -1,0 +1,121 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - BASE64{% endblock %}
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-plain_text.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            localStorageKey: 'locode_base64_left_content',
+            editor_left: null,
+            editor_right: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        encodeBase64() {
+                            let left_content = App.editor_left.getValue();
+                            let right_editor = App.editor_right;
+                            let encoded_content = btoa(left_content);
+                            right_editor.setValue(encoded_content, -1);
+                        },
+                        decodeBase64() {
+                            let left_content = App.editor_left.getValue();
+                            let right_editor = App.editor_right;
+                            try {
+                                let decoded_content = atob(left_content);
+                                right_editor.setValue(decoded_content, -1);
+                            } catch (e) {
+                                alert("Invalid BASE64");
+                            }
+                        },
+       
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce(){
+                this.editor_left = ace.edit("editor_left");
+                this.editor_left.setTheme("ace/theme/monokai");
+                this.editor_left.session.setMode("ace/mode/plain_text");
+                this.editor_left.getSession().setUseWrapMode(true);
+                
+                const editor_left = document.getElementById("editor_left");
+                new ResizeObserver(() => {
+                    this.editor_left.resize();
+                }).observe(editor_left);
+
+                let value = localStorage.getItem(App.localStorageKey) || "";
+                this.editor_left.setValue(value, -1);
+
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/plain_text");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Usage</h2>
+    <p>Encode and decode BASE64 content.</p>
+    <h2>Example</h2>
+    <p>Enter the content in the left editor and click on the "Encode" button to see the encoded content in the right editor.</p>
+    <p>Enter bsae64 content in right editor and click on the "Decode" button to see the decoded content in the left editor.</p>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="domTraversal">
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.saveContent('editor_left', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_left')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_left"></div>
+        </div>
+        <div class="col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2 d-flex flex-column justify-content-center">
+            <button @click="encodeBase64" class="btn btn-dark mb-2">Encode <i class="bi bi-arrow-right-square"></i></button>
+            <button @click="decodeBase64" class="btn btn-dark"><i class="bi bi-arrow-left-square"></i> Decode</button>
+        </div>
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,293 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Notes{% endblock %}
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-plain_text.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-markdown.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+
+        var App = {
+            localStorageKey: 'locode_notes_last_file',
+            editor_left: null,
+            editor_right: null,
+            currentFile: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        isOneLine: false,
+                        files: [],
+                        currentFile: null,
+                        currentFileName: "",
+                        sort: 'name_asc', // name_asc, name_desc, size_asc, size_desc
+                        init() {
+                            this.loadFileList();
+
+                            let fileName = localStorage.getItem(App.localStorageKey) || null;
+                            if(fileName) {
+                                this.loadFileContent(fileName);
+                            }
+                        },
+                        loadFileContent(fileName) {
+
+                            localStorage.setItem(App.localStorageKey, fileName);
+
+                            const file = btoa(fileName);
+                            fetch(`/api/notes/${file}`)
+                                .then(response => response.text())
+                                .then(content => {
+                                    ace.edit('editor_left').setValue(content, -1);
+                                    App.currentFile = fileName;
+                                    this.currentFile = fileName;
+                                    this.currentFileName = fileName;
+                                })
+                                .catch(error => {
+                                    alert("Error loading file: " + error);
+                                });
+                        },
+                        loadNewFile() {
+                            fetch(`/api/notes`, {
+                                method: 'POST',
+                                body: ''
+                            })
+                                .then(response => {
+                                    if (response.ok) {
+                                        
+                                        let fileName = "";
+                                        for(let entry of response.headers.entries()) {
+                                            if( entry[0].toLowerCase() === 'x-file-name') {
+                                                fileName = entry[1];
+                                                break;
+                                            }
+                                        }
+
+                                        if(!fileName) {
+                                            alert("Error creating new file. Missing header X-FILE-NAME.");
+                                            return;
+                                        }
+
+                                        localStorage.setItem(App.localStorageKey, fileName);
+
+                                        ace.edit('editor_left').setValue('', -1);
+                                        this.loadFileList();
+
+                                        App.currentFile = fileName;
+                                        this.currentFile = fileName;
+                                        this.currentFileName = fileName;
+                                        
+                                        alert("File created successfully");
+                                    } else {
+                                        alert("Error creating new file");
+                                    }
+                                })
+                                .catch(error => {
+                                    alert("Error creating new file: " + error);
+                                });
+                        },
+                        saveFileContent() {
+                            if (!this.currentFile) {
+                                alert("No file selected");
+                                return;
+                            }
+                            const content = ace.edit('editor_left').getValue();
+                            fetch(`/api/notes/${btoa(this.currentFile)}`, {
+                                method: 'POST',
+                                headers: {
+                                    'X-File-Name': this.currentFileName
+                                },
+                                body: JSON.stringify({ content: content })
+                            })
+                            .then(response => {
+                                if (response.ok) {
+                                    this.loadFileList();
+                                    localStorage.setItem(App.localStorageKey, this.currentFileName);
+                                    alert("File saved successfully");
+                                } else {
+                                    alert("Error saving file");
+                                }
+                            })
+                            .catch(error => {
+                                alert("Error saving file: " + error);
+                            });
+                        },
+                        loadFileList(sort = 'updated_at,desc') {
+                            fetch('/api/notes/files?sort=' + sort)
+                                .then(response => response.json())
+                                .then(data => {
+                                    this.files = data.files;
+                                })
+                                .catch(error => {
+                                    alert("Error loading file list: " + error);
+                                });
+                        },
+                        
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_left = ace.edit("editor_left");
+                this.editor_left.setTheme("ace/theme/monokai");
+                this.editor_left.session.setMode("ace/mode/markdown");
+                this.editor_left.getSession().setUseWrapMode(true);
+
+                const editor_left = document.getElementById("editor_left");
+                new ResizeObserver(() => {
+                    this.editor_left.resize();
+                }).observe(editor_left);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p>This is simple Markdown note making app.</p>
+
+    <p>You can create, edit and save your notes in Markdown format.</p>
+
+    <h2>Headings</h2>
+
+    <pre class="bg-dark"><code class="text-success">
+    # Heading 1
+    ## Heading 2
+    ### Heading 3
+    #### Heading 4
+    ##### Heading 5
+    ###### Heading 6
+    </code></pre>
+
+
+    
+    <h2>Bold & Italics</h2>
+    <pre class="bg-dark"><code class="text-success">
+    **Bold** or __Bold__
+    *Italic* or _Italic_
+    ~~Strikethrough~~
+    </code></pre>
+
+    
+    <h2>Lists</h2>
+    <h4>Unordered</h4>
+    <pre class="bg-dark"><code class="text-success">
+    - Item 1
+    - Item 2
+        - Subitem 1
+        - Subitem 2
+    </code></pre>
+
+    
+    <h4>Ordered</h4>
+    <pre class="bg-dark"><code class="text-success">
+    1. Item 1
+    2. Item 2
+        1. Subitem 1
+        2. Subitem 2
+    </code></pre>
+    
+    <h2>Links</h2>
+    <pre class="bg-dark"><code class="text-success">
+    [OpenAI](https://openai.com)
+    </code></pre>
+    
+    <h2>Images</h2>
+    <pre class="bg-dark"><code class="text-success">
+    ![Alt text](https://via.placeholder.com/150 "Image Title")
+    </code></pre>
+    
+    <h2>Blockquotes</h2>
+    <pre class="bg-dark"><code class="text-success">
+    > This is a blockquote.
+    </code></pre>
+    
+    <h2>Code</h2>
+
+    <h4>Inline Code</h4>
+    <pre class="bg-dark"><code class="text-success">
+    Use `<code>` tags for inline code.
+    </code></pre>
+
+    <h4>Code Blocks</h4>
+    <pre class="bg-dark"><code class="text-success">
+    ```
+    function helloWorld() {
+        console.log("Hello, world!");
+    }
+    ```
+    </code></pre>
+    
+    <h2>Tables</h2>
+
+    <pre class="bg-dark"><code class="text-success">
+    | Column 1 | Column 2 | Column 3 |
+    |----------|----------|----------|
+    | Data 1   | Data 2   | Data 3   |
+    | Data 4   | Data 5   | Data 6   |
+    </code></pre>
+    
+    <h2>Horizontal Line</h2>
+    <pre class="bg-dark"><code class="text-success">
+    ---
+    </code></pre>
+
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1> 
+    </div>
+
+    <div class="row" x-data="domTraversal" x-init="init()">
+        <div class="col-2">
+            <div class="file-manager">
+                <div class="file-manager-toolbar">
+                    <a class="btn btn-sm btn-outline-secondary" @click="loadNewFile()" title="New file"><i class="bi bi-file-earmark-plus"></i></a>
+                    <a class="btn btn-sm btn-outline-secondary" @click="loadFileList('name,asc')" title="Sort by name A-Z"><i class="bi bi-sort-alpha-down"></i></a>
+                    {# <a class="btn btn-sm btn-outline-secondary" @click="loadFileList('name,desc')" title="Sort by name Z-A"><i class="bi bi-sort-alpha-up"></i></a> #}
+                    <a class="btn btn-sm btn-outline-secondary" @click="loadFileList('size,asc')" title="Sort by size ASC"><i class="bi bi-sort-numeric-down"></i></a>
+                    {# <a class="btn btn-sm btn-outline-secondary" @click="loadFileList('size,desc')" title="Sort by size DEC"><i class="bi bi-sort-numeric-up"></i></a> #}
+                    <a class="btn btn-sm btn-outline-secondary" @click="loadFileList('updated_at,desc')" title="Sort by date DESC"><i class="bi bi-sort-up"></i></a>
+                </div>
+                <div class="file-manager-items">
+                    <template x-for="file in files" :key="file.name">
+                        <div class="file-item" :class="(file.name==currentFile) ? 'active' : ''" @dblclick="loadFileContent(file.name)" title="Double click to open"><span x-text="file.name" class="file-name"></span> (<span x-text="file.size_formated" class="file-size"></span>)</div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        <div class="col-10">
+
+            <div class="ace-toolbar">
+                <button @click="saveFileContent()" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+                <div class="d-inline-block">
+                    <input type="text" class="form-control form-control-sm" x-model="currentFileName">
+                </div>
+            </div>
+            <div class="ace-editor" id="editor_left" style="height: 900px"></div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

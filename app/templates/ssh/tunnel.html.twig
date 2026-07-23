@@ -1,0 +1,399 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - SSH Tunnel Generator{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-sh.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            editor: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('tunnelGenerator', () => ({
+                        // SSH Connection
+                        sshUser: '',
+                        sshHost: '',
+                        sshPort: 22,
+                        identityFile: '~/.ssh/id_ed25519',
+                        useConfigAlias: false,
+                        sshAlias: '',
+                        
+                        // Tunnel Configuration
+                        tunnelType: 'local',
+                        bindAddress: '127.0.0.1',
+                        bindPort: 8080,
+                        remoteHost: '192.168.1.100',
+                        remotePort: 80,
+                        socksPort: 1080,
+                        
+                        // SSH Options
+                        noCommand: true,
+                        verbose: 0,
+                        compression: false,
+                        gssapiAuth: false,
+                        serverAliveInterval: 0,
+                        serverAliveCountMax: 3,
+                        
+                        // Execution Options
+                        background: false,
+                        logFile: '',
+                        
+                        // Route Options
+                        addRoute: false,
+                        routeType: 'host',
+                        routeTarget: '192.168.1.100',
+                        routeNetmask: '255.255.255.0',
+                        routeGateway: '127.0.0.1',
+                        
+                        init() {
+                            this.generate();
+                        },
+                        
+                        generate() {
+                            let commands = [];
+                            
+                            // Build SSH tunnel command
+                            let sshCmd = 'ssh';
+                            
+                            // Verbose
+                            if (this.verbose > 0) {
+                                sshCmd += ' -' + 'v'.repeat(this.verbose);
+                            }
+                            
+                            // GSSAPI Authentication
+                            if (!this.gssapiAuth) {
+                                sshCmd += ' -o GSSAPIAuthentication=no';
+                            }
+                            
+                            // Compression
+                            if (this.compression) {
+                                sshCmd += ' -C';
+                            }
+                            
+                            // Identity file
+                            if (this.identityFile) {
+                                sshCmd += ' -i ' + this.identityFile;
+                            }
+                            
+                            // Server alive options
+                            if (this.serverAliveInterval > 0) {
+                                sshCmd += ' -o ServerAliveInterval=' + this.serverAliveInterval;
+                                sshCmd += ' -o ServerAliveCountMax=' + this.serverAliveCountMax;
+                            }
+                            
+                            // SSH connection
+                            if (this.useConfigAlias && this.sshAlias) {
+                                sshCmd += ' ' + this.sshAlias;
+                            } else {
+                                if (this.sshUser) sshCmd += ' ' + this.sshUser + '@';
+                                sshCmd += this.sshHost;
+                                if (this.sshPort && this.sshPort !== 22) {
+                                    sshCmd += ' -p ' + this.sshPort;
+                                }
+                            }
+                            
+                            // Tunnel configuration
+                            if (this.tunnelType === 'local') {
+                                // Local forwarding: -L [bind_address:]port:host:hostport
+                                let forward = '-L ';
+                                if (this.bindAddress) forward += this.bindAddress + ':';
+                                forward += this.bindPort + ':' + this.remoteHost + ':' + this.remotePort;
+                                sshCmd += ' ' + forward;
+                            } else if (this.tunnelType === 'remote') {
+                                // Remote forwarding: -R [bind_address:]port:host:hostport
+                                let forward = '-R ';
+                                if (this.bindAddress) forward += this.bindAddress + ':';
+                                forward += this.bindPort + ':' + this.remoteHost + ':' + this.remotePort;
+                                sshCmd += ' ' + forward;
+                            } else if (this.tunnelType === 'dynamic') {
+                                // Dynamic forwarding (SOCKS): -D [bind_address:]port
+                                let forward = '-D ';
+                                if (this.bindAddress) forward += this.bindAddress + ':';
+                                forward += this.socksPort;
+                                sshCmd += ' ' + forward;
+                            }
+                            
+                            // No command execution
+                            if (this.noCommand) {
+                                sshCmd += ' -N';
+                            }
+                            
+                            // Log file
+                            if (this.logFile) {
+                                sshCmd += ' > ' + this.logFile;
+                            }
+                            
+                            // Background execution
+                            if (this.background) {
+                                sshCmd += ' &';
+                            }
+                            
+                            commands.push(sshCmd);
+                            
+                            // Add route commands if enabled
+                            if (this.addRoute && this.routeTarget) {
+                                commands.push('');
+                                commands.push('# Route configuration');
+                                
+                                if (this.routeType === 'host') {
+                                    commands.push('sudo route add -host ' + this.routeTarget + ' gw ' + this.routeGateway);
+                                } else if (this.routeType === 'network') {
+                                    commands.push('sudo route add -net ' + this.routeTarget + ' netmask ' + this.routeNetmask + ' gw ' + this.routeGateway);
+                                }
+                            }
+                            
+                            App.editor.setValue(commands.join('\n'), -1);
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor = ace.edit("editor");
+                this.editor.setTheme("ace/theme/monokai");
+                this.editor.session.setMode("ace/mode/sh");
+                this.editor.setReadOnly(true);
+
+                const editor = document.getElementById("editor");
+                new ResizeObserver(() => {
+                    this.editor.resize();
+                }).observe(editor);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>SSH Tunnel Generator</h2>
+    <p>Generate SSH tunnel commands for port forwarding and secure proxying.</p>
+    
+    <h3>Tunnel Types:</h3>
+    <ul>
+        <li><strong>Local Forwarding (-L):</strong> Forward local port to remote destination through SSH server</li>
+        <li><strong>Remote Forwarding (-R):</strong> Forward remote port back to local destination</li>
+        <li><strong>Dynamic Forwarding (-D):</strong> Create SOCKS proxy on local port</li>
+    </ul>
+    
+    <h3>Common Use Cases:</h3>
+    <ul>
+        <li><strong>Access remote service:</strong> Local forwarding to reach services behind firewall</li>
+        <li><strong>Expose local service:</strong> Remote forwarding to make local service accessible remotely</li>
+        <li><strong>SOCKS proxy:</strong> Dynamic forwarding for browser proxy or tunneling all traffic</li>
+    </ul>
+    
+    <h3>Options:</h3>
+    <ul>
+        <li><strong>-N:</strong> Don't execute remote command (port forwarding only)</li>
+        <li><strong>-v/-vv/-vvv:</strong> Verbose output (debugging)</li>
+        <li><strong>-C:</strong> Enable compression</li>
+        <li><strong>GSSAPIAuthentication:</strong> Kerberos authentication (disable for faster connection)</li>
+        <li><strong>ServerAliveInterval:</strong> Keep connection alive (seconds between keepalive messages)</li>
+    </ul>
+    
+    <h3>Route Commands:</h3>
+    <p>When tunneling creates a virtual interface, you may need to add routes:</p>
+    <ul>
+        <li><strong>Host route:</strong> Route single IP through tunnel gateway</li>
+        <li><strong>Network route:</strong> Route entire subnet through tunnel gateway</li>
+    </ul>
+    
+    <h3>Examples:</h3>
+    <pre>
+# Access remote database
+ssh -L 127.0.0.1:3306:db.internal:3306 user@jumphost -N
+
+# SOCKS proxy for browser
+ssh -D 127.0.0.1:1080 user@server -N
+
+# Expose local web server
+ssh -R 0.0.0.0:8080:localhost:80 user@server -N
+    </pre>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="tunnelGenerator">
+        <div class="col-12 col-md-4">
+            <div class="row g-3">
+                <div class="col-12">
+                    <h5>SSH Connection</h5>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="useConfigAlias" x-model="useConfigAlias" @change="generate()">
+                        <label class="form-check-label" for="useConfigAlias">
+                            Use SSH Config Alias <small class="text-muted">(~/.ssh/config)</small>
+                        </label>
+                    </div>
+                    
+                    <div x-show="useConfigAlias">
+                        <input type="text" class="form-control form-control-sm mb-2" x-model="sshAlias" @input="generate()" placeholder="host-alias">
+                        <small class="form-text text-muted">SSH Config Alias</small>
+                    </div>
+                    
+                    <div x-show="!useConfigAlias">
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="sshUser" @input="generate()" placeholder="user">
+                                <small class="form-text text-muted">User</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" x-model="sshHost" @input="generate()" placeholder="hostname">
+                                <small class="form-text text-muted">Host</small>
+                            </div>
+                        </div>
+                        <input type="number" class="form-control form-control-sm mb-2" x-model="sshPort" @input="generate()" placeholder="22">
+                        <small class="form-text text-muted">SSH Port</small>
+                    </div>
+                    
+                    <input type="text" class="form-control form-control-sm mt-2" x-model="identityFile" @input="generate()" placeholder="~/.ssh/id_ed25519">
+                    <small class="form-text text-muted">Identity File</small>
+                </div>
+                
+                <div class="col-12">
+                    <h5>Tunnel Configuration</h5>
+                    <label for="tunnelType" class="form-label">Tunnel Type</label>
+                    <select class="form-select form-select-sm mb-2" id="tunnelType" x-model="tunnelType" @change="generate()">
+                        <option value="local">Local Forwarding (-L)</option>
+                        <option value="remote">Remote Forwarding (-R)</option>
+                        <option value="dynamic">Dynamic/SOCKS Proxy (-D)</option>
+                    </select>
+                    
+                    <div x-show="tunnelType === 'local' || tunnelType === 'remote'">
+                        <label class="form-label mt-2">Local Binding</label>
+                        <div class="row mb-2">
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm" x-model="bindAddress" @input="generate()" placeholder="127.0.0.1">
+                                <small class="form-text text-muted">Bind Address</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" x-model="bindPort" @input="generate()" placeholder="8080">
+                                <small class="form-text text-muted">Port</small>
+                            </div>
+                        </div>
+                        
+                        <label class="form-label">Remote Target</label>
+                        <div class="row mb-2">
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm" x-model="remoteHost" @input="generate()" placeholder="192.168.1.100">
+                                <small class="form-text text-muted">Remote Host</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" x-model="remotePort" @input="generate()" placeholder="80">
+                                <small class="form-text text-muted">Port</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div x-show="tunnelType === 'dynamic'">
+                        <label class="form-label mt-2">SOCKS Proxy</label>
+                        <div class="row mb-2">
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm" x-model="bindAddress" @input="generate()" placeholder="127.0.0.1">
+                                <small class="form-text text-muted">Bind Address</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" x-model="socksPort" @input="generate()" placeholder="1080">
+                                <small class="form-text text-muted">Port</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <h5>SSH Options</h5>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="noCommand" x-model="noCommand" @change="generate()">
+                        <label class="form-check-label" for="noCommand">-N (No command execution)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="compression" x-model="compression" @change="generate()">
+                        <label class="form-check-label" for="compression">-C (Compression)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="gssapiAuth" x-model="gssapiAuth" @change="generate()">
+                        <label class="form-check-label" for="gssapiAuth">Enable GSSAPI Authentication</label>
+                    </div>
+                    
+                    <label for="verbose" class="form-label mt-2">Verbose Level</label>
+                    <select class="form-select form-select-sm mb-2" id="verbose" x-model="verbose" @change="generate()">
+                        <option :value="0">None</option>
+                        <option :value="1">-v (Verbose)</option>
+                        <option :value="2">-vv (More verbose)</option>
+                        <option :value="3">-vvv (Debug)</option>
+                    </select>
+                    
+                    <label for="serverAliveInterval" class="form-label mt-2">Keep Alive (seconds)</label>
+                    <input type="number" class="form-control form-control-sm mb-2" id="serverAliveInterval" x-model="serverAliveInterval" @input="generate()" placeholder="0 (disabled)">
+                    <small class="form-text text-muted">ServerAliveInterval - 0 to disable</small>
+                </div>
+                
+                <div class="col-12">
+                    <h5>Execution Options</h5>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="background" x-model="background" @change="generate()">
+                        <label class="form-check-label" for="background">Run in background (&amp;)</label>
+                    </div>
+                    
+                    <label for="logFile" class="form-label mt-2">Log Output File (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="logFile" x-model="logFile" @input="generate()" placeholder="/tmp/ssh-tunnel.log">
+                </div>
+                
+                <div class="col-12">
+                    <h5>Route Configuration</h5>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="addRoute" x-model="addRoute" @change="generate()">
+                        <label class="form-check-label" for="addRoute">Add route command</label>
+                    </div>
+                    
+                    <div x-show="addRoute">
+                        <label for="routeType" class="form-label">Route Type</label>
+                        <select class="form-select form-select-sm mb-2" id="routeType" x-model="routeType" @change="generate()">
+                            <option value="host">Host Route</option>
+                            <option value="network">Network Route</option>
+                        </select>
+                        
+                        <input type="text" class="form-control form-control-sm mb-2" x-model="routeTarget" @input="generate()" placeholder="192.168.1.100">
+                        <small class="form-text text-muted" x-text="routeType === 'host' ? 'Target Host' : 'Target Network'"></small>
+                        
+                        <div x-show="routeType === 'network'">
+                            <input type="text" class="form-control form-control-sm mb-2" x-model="routeNetmask" @input="generate()" placeholder="255.255.255.0">
+                            <small class="form-text text-muted">Netmask</small>
+                        </div>
+                        
+                        <input type="text" class="form-control form-control-sm mb-2" x-model="routeGateway" @input="generate()" placeholder="127.0.0.1">
+                        <small class="form-text text-muted">Gateway</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-md-8">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.copyToClipboard('editor')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i> Copy Command
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

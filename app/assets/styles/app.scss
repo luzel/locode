@@ -1,0 +1,116 @@
+:root {
+    color-scheme: dark;
+}
+
+body {
+    background-color: lightgray;
+    overflow: auto;
+
+    div.main {
+        padding-top: 1rem;
+        padding-bottom: 10rem;
+    }
+
+    footer {
+        position: fixed; 
+        bottom: 0; 
+        width: 100%; 
+        z-index: 1000;
+        padding: 10px 10px 10px 10px;
+
+        box-shadow: -1px -4px 12px -1px rgba(0,0,0,0.20);
+        -webkit-box-shadow: -1px -4px 12px -1px rgba(0,0,0,0.20);
+        -moz-box-shadow: -1px -4px 12px -1px rgba(0,0,0,0.20);
+
+        p {
+            font-size: 10px;
+            padding: 0px;
+            margin: 0px;
+        }
+    }
+}
+
+.navbar {
+    box-shadow: -1px 4px 12px -1px rgba(0,0,0,0.20);
+    -webkit-box-shadow: -1px 4px 12px -1px rgba(0,0,0,0.20);
+    -moz-box-shadow: -1px 4px 12px -1px rgba(0,0,0,0.20);
+    
+    .nav-link.active {
+        text-decoration: underline;
+    }
+}
+
+
+.ace-toolbar {
+    background-color: #F8F9FA;
+    padding: 5px;
+    border: 1px solid #303129;
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    position: relative;
+}
+
+.ace-editor {
+    width: 100%;
+    height: 80vh;
+    resize: vertical;
+    overflow: hidden;
+    min-height: 80vh;
+    border: 1px solid #303129;
+}
+
+.file-manager {
+    
+    height: 900px;
+
+    .file-manager-toolbar {
+        background-color: #F8F9FA;
+        padding: 5px;
+        border: 1px solid #303129;
+        border-bottom: none;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        position: relative;
+    }
+
+    .file-manager-items {
+
+        background-color: #2F3129;
+        color: #8F908A;
+        font-size: 12px;
+        font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, "Source Code Pro", source-code-pro, monospace;
+
+        height: 880px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+
+        .file-item {
+
+            padding: 2px 5px 5px 5px;
+            border-bottom: 1px solid #303129;
+            cursor: pointer;
+
+            .file-name {
+                font-size: 12px;
+                font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, "Source Code Pro", source-code-pro, monospace;
+            }
+
+            .file-size {
+                font-size: 9px;
+                font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, "Source Code Pro", source-code-pro, monospace;
+            }
+    
+            &:hover,
+            &.active {
+                background-color: #212529;
+                color: #F8F9FA;
+            }
+    
+        }
+    }
+}
+
+.offcanvas {
+    padding-bottom: 50px;
+}

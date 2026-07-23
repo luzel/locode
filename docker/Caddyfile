@@ -1,0 +1,10 @@
+{
+	frankenphp
+	admin off
+}
+
+{$SERVER_NAME} {
+	root * /app/public
+	encode zstd br gzip
+	php_server
+}

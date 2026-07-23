@@ -1,0 +1,144 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - Serialize{% endblock %}
+
+{% block javascripts_head %}
+    <script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/ext-beautify.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-php.js" type="text/javascript" charset="utf-8"></script>
+    <script src="/ace/src-min-noconflict/mode-json.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var App = {
+            localStorageKey: 'locode_jwt_left_content',
+            editor_left: null,
+            editor_right: null,
+            init() {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('domTraversal', () => ({
+                        decode() {
+                            let left_content = App.editor_left.getValue();
+                            localStorage.setItem(App.localStorageKey, left_content);
+
+                            function base64UrlDecode(str) {
+                                let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+                                return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+                            }
+                            
+                            try {
+                                const [header, payload, signature] = left_content.split('.');
+                                const formatted = {
+                                    header: JSON.parse(base64UrlDecode(header)),
+                                    payload: JSON.parse(base64UrlDecode(payload)),
+                                    signature: signature
+                                };
+                                App.editor_right.setValue(JSON.stringify(formatted, null, 4), -1);
+                            } catch (e) {
+                                alert("Invalid JWT Token");
+                            }
+                        }
+                    }));
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initAce();
+                });
+            },
+            initAce() {
+                this.editor_left = ace.edit("editor_left");
+                this.editor_left.setTheme("ace/theme/monokai");
+                this.editor_left.session.setMode("ace/mode/plain_text");
+                this.editor_left.getSession().setUseWrapMode(true);
+
+                const editor_left = document.getElementById("editor_left");
+                new ResizeObserver(() => {
+                    this.editor_left.resize();
+                }).observe(editor_left);
+
+                let value = localStorage.getItem(App.localStorageKey) || "";
+                this.editor_left.setValue(value, -1);
+
+                this.editor_right = ace.edit("editor_right");
+                this.editor_right.setTheme("ace/theme/monokai");
+                this.editor_right.session.setMode("ace/mode/json");
+
+                const editor_right = document.getElementById("editor_right");
+                new ResizeObserver(() => {
+                    this.editor_right.resize();
+                }).observe(editor_right);
+            }
+        }
+        App.init();
+    </script>
+{% endblock %} 
+{% block stylesheets_head %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+{% endblock %}
+{% block offcanvas %}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="appHelp" aria-labelledby="offcanvasLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasLabel">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h2>Usage</h2>
+    <p>Enter the JWT token in the left editor and click on the "Decode" button to see the decoded token in the right editor.</p>
+    <h2>Example</h2>
+
+    <pre class="bg-dark"><code class="text-success">
+    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+    </code></pre>
+
+    <h2>JWT</h2>
+    <p>JWT is a compact, URL-safe means of representing claims to be transferred between two parties. The claims in a JWT are encoded as a JSON object that is used as the payload of a JSON Web Signature (JWS) structure or as the plaintext of a JSON Web Encryption (JWE) structure, enabling the claims to be digitally signed or integrity protected with a Message Authentication Code (MAC) and/or encrypted.</p>
+    <p>JWTs are used in the OpenID Connect (OIDC) protocol and OAuth 2.0 protocol.</p>
+    <h3>Header</h3>
+    <p>The header typically consists of two parts: the type of the token, which is JWT, and the signing algorithm being used, such as HMAC SHA256 or RSA.</p>
+    <h3>Payload</h3>
+    <p>The second part of the token is the payload, which contains the claims. Claims are statements about an entity (typically, the user) and additional data. There are three types of claims: registered, public, and private claims.</p>
+    <h3>Signature</h3>
+    <p>To create the signature part you have to take the encoded header, the encoded payload, a secret, the algorithm specified in the header, and sign that.</p>
+  </div>
+</div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <h1>{{ title }} <a class="btn btn-dark" data-bs-toggle="offcanvas" href="#appHelp" role="button" aria-controls="appHelp" title="Help"><i class="bi bi-person-raised-hand"></i></a></h1>
+    </div>
+    <div class="row justify-content-start" x-data="domTraversal">
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.saveContent('editor_left', App.localStorageKey)" class="btn btn-sm btn-outline-secondary" title="Save Content">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_left')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleFullScreen('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_left')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_left"></div>
+        </div>
+        <div class="col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2 d-flex flex-column justify-content-center">
+            <button @click="decode" class="btn btn-dark">Decode <i class="bi bi-arrow-right-square"></i></button>
+        </div>
+        <div class="col-12 col-sm-5 col-md-5 col-lg-5 col-xl-5 col-xxl-5">
+            <div class="ace-toolbar">
+                <button @click="AceToolbar.toggleFullScreen('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Fullscreen">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <button @click="AceToolbar.copyToClipboard('editor_right')" class="btn btn-sm btn-outline-secondary" title="Copy to clipboard">
+                    <i class="bi bi-copy"></i>
+                </button>
+                <button @click="AceToolbar.toggleLineWrap('editor_right')" class="btn btn-sm btn-outline-secondary" title="Toggle Line Wrap">
+                    <i class="bi bi-text-wrap"></i>
+                </button>
+            </div>
+            <div class="ace-editor" id="editor_right"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

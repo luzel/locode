@@ -1,0 +1,16 @@
+# Enable URL rewriting
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+
+# Disable directory listing
+Options -Indexes
+
+# Set default index file
+DirectoryIndex index.php
+
+# Prevent access to .htaccess itself
+<Files ".htaccess">
+    Require all denied
+</Files>
