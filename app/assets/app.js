@@ -8,6 +8,7 @@
 // any CSS you import will output into a single css file (app.css in this case)
 import Alpine from 'alpinejs';
 import yaml from 'js-yaml';
+import QRCode from 'qrcode';
 
 import './styles/app.scss';
 
@@ -82,6 +83,7 @@ window['AceToolbar'] = {
 }
 
 window['Alpine'] = Alpine;
+window['QRCode'] = QRCode;
 Alpine.start();
 
 // expose js-yaml as a global variable

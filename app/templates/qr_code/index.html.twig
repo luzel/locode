@@ -1,0 +1,98 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}loCode - QR Code Generator{% endblock %}
+
+{% block body %}
+<div class="container-fluid" x-data="qrCodeGenerator()">
+    <div class="row">
+        <div class="col">
+            <h1>{{ title }}</h1>
+            <p class="text-muted">Generate a QR code locally in your browser and download it as a PNG image.</p>
+        </div>
+    </div>
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <form class="row g-3" @submit.prevent="generate()">
+                <div class="col-12">
+                    <label for="qrContent" class="form-label">Content</label>
+                    <textarea class="form-control" id="qrContent" rows="7" x-model="content" required placeholder="Text, URL, Wi-Fi configuration, or other QR content"></textarea>
+                    <div class="form-text">Your content never leaves this browser.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="qrErrorCorrection" class="form-label">Error correction</label>
+                    <select class="form-select" id="qrErrorCorrection" x-model="errorCorrectionLevel">
+                        <option value="L">Low (7%)</option>
+                        <option value="M">Medium (15%)</option>
+                        <option value="Q">Quartile (25%)</option>
+                        <option value="H">High (30%)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="qrSize" class="form-label">Size</label>
+                    <select class="form-select" id="qrSize" x-model.number="width">
+                        <option value="256">256 px</option>
+                        <option value="512">512 px</option>
+                        <option value="1024">1024 px</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="qrMargin" class="form-label">Margin</label>
+                    <select class="form-select" id="qrMargin" x-model.number="margin">
+                        <option value="1">Small</option>
+                        <option value="4">Normal</option>
+                        <option value="8">Large</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark">Generate QR code</button>
+                    <button type="button" class="btn btn-dark" @click="clear()">Clear</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center gap-3">
+                    <p class="mb-0" x-show="!imageUrl">Enter content and generate your QR code.</p>
+                    <img x-show="imageUrl" :src="imageUrl" alt="Generated QR code" class="img-fluid border" style="max-width: min(100%, 512px); image-rendering: pixelated;">
+                    <a x-show="imageUrl" :href="imageUrl" download="locode-qr-code.png" class="btn btn-dark">Download PNG</a>
+                    <p x-show="error" class="text-danger mb-0" x-text="error" role="alert"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts_footer %}
+<script>
+    function qrCodeGenerator() {
+        return {
+            content: '',
+            errorCorrectionLevel: 'M',
+            width: 512,
+            margin: 4,
+            imageUrl: '',
+            error: '',
+            async generate() {
+                this.error = '';
+                try {
+                    this.imageUrl = await window.QRCode.toDataURL(this.content, {
+                        errorCorrectionLevel: this.errorCorrectionLevel,
+                        width: this.width,
+                        margin: this.margin,
+                        color: { dark: '#000000', light: '#FFFFFFFF' },
+                    });
+                } catch (exception) {
+                    this.imageUrl = '';
+                    this.error = 'The QR code could not be generated. Try shorter content or a lower correction level.';
+                }
+            },
+            clear() {
+                this.content = '';
+                this.imageUrl = '';
+                this.error = '';
+            },
+        };
+    }
+</script>
+{% endblock %}

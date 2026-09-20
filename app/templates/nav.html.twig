@@ -34,6 +34,9 @@
                     <a class="nav-link {% if app.request.attributes.get('_route') == 'app_jwt' %}active{% endif %}" href="{{ path('app_jwt') }}">JWT</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if app.request.attributes.get('_route') == 'app_qr_code' %}active{% endif %}" href="{{ path('app_qr_code') }}">QR Code</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if app.request.attributes.get('_route') == 'app_crontab' %}active{% endif %}" href="{{ path('app_crontab') }}">Crontab</a>
                 </li>
                 <li class="nav-item">

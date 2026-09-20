@@ -23,6 +23,7 @@
         "ace-builds": "^1.37.1",
         "alpinejs": "^3.14.9",
         "bootstrap": "^5.3.3",
-        "js-yaml": "^4.1.0"
+        "js-yaml": "^4.1.0",
+        "qrcode": "^1.5.4"
     }
 }
