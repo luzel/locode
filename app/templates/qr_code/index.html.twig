@@ -2,6 +2,11 @@
 
 {% block title %}loCode - QR Code Generator{% endblock %}
 
+{% block javascripts_head %}
+<script src="/ace/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+<script src="/ace/src-min-noconflict/mode-text.js" type="text/javascript" charset="utf-8"></script>
+{% endblock %}
+
 {% block body %}
 <div class="container-fluid" x-data="qrCodeGenerator()">
     <div class="row">
@@ -15,7 +20,7 @@
             <form class="row g-3" @submit.prevent="generate()">
                 <div class="col-12">
                     <label for="qrContent" class="form-label">Content</label>
-                    <textarea class="form-control" id="qrContent" rows="7" x-model="content" required placeholder="Text, URL, Wi-Fi configuration, or other QR content"></textarea>
+                    <div id="qrContent" class="ace-editor qr-code-editor" aria-label="QR code content"></div>
                     <div class="form-text">Your content never leaves this browser.</div>
                 </div>
                 <div class="col-md-6">
@@ -67,16 +72,33 @@
 <script>
     function qrCodeGenerator() {
         return {
-            content: '',
             errorCorrectionLevel: 'M',
             width: 512,
             margin: 4,
             imageUrl: '',
             error: '',
+            init() {
+                document.addEventListener('DOMContentLoaded', () => {
+                    const editor = ace.edit('qrContent');
+                    editor.setTheme('ace/theme/monokai');
+                    editor.session.setMode('ace/mode/text');
+                    editor.session.setUseWrapMode(true);
+                    editor.setOption('placeholder', 'Text, URL, Wi-Fi configuration, or other QR content');
+                    new ResizeObserver(() => editor.resize()).observe(document.getElementById('qrContent'));
+                });
+            },
+            getContent() {
+                return ace.edit('qrContent').getValue();
+            },
             async generate() {
                 this.error = '';
+                const content = this.getContent();
+                if (!content.trim()) {
+                    this.error = 'Enter content to generate a QR code.';
+                    return;
+                }
                 try {
-                    this.imageUrl = await window.QRCode.toDataURL(this.content, {
+                    this.imageUrl = await window.QRCode.toDataURL(content, {
                         errorCorrectionLevel: this.errorCorrectionLevel,
                         width: this.width,
                         margin: this.margin,
@@ -88,11 +110,12 @@
                 }
             },
             clear() {
-                this.content = '';
+                ace.edit('qrContent').setValue('', -1);
                 this.imageUrl = '';
                 this.error = '';
             },
         };
     }
+    document.addEventListener('alpine:init', () => Alpine.data('qrCodeGenerator', qrCodeGenerator));
 </script>
 {% endblock %}
