@@ -48,6 +48,31 @@
                         <option value="8">Large</option>
                     </select>
                 </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="qrShowLabel" x-model="showLabel">
+                        <label class="form-check-label" for="qrShowLabel">Add printable label</label>
+                    </div>
+                </div>
+                <div class="col-12" x-show="showLabel" x-cloak>
+                    <label for="qrLabelText" class="form-label">Label text</label>
+                    <input type="text" class="form-control" id="qrLabelText" x-model="labelText" @input="labelCustomized = true" placeholder="Uses the QR content by default">
+                    <div class="form-text">The label follows the QR content until you edit it.</div>
+                </div>
+                <div class="col-md-6" x-show="showLabel" x-cloak>
+                    <label for="qrLabelPosition" class="form-label">Label position</label>
+                    <select class="form-select" id="qrLabelPosition" x-model="labelPosition">
+                        <option value="above">Above</option>
+                        <option value="below">Below</option>
+                    </select>
+                </div>
+                <div class="col-md-6" x-show="showLabel" x-cloak>
+                    <label for="qrLabelFontSize" class="form-label">Label font size</label>
+                    <div class="input-group">
+                        <input type="range" class="form-range" id="qrLabelFontSize" x-model.number="labelFontSize" min="12" max="48" step="1" aria-describedby="qrLabelFontSizeValue">
+                        <span class="input-group-text" id="qrLabelFontSizeValue"><span x-text="labelFontSize"></span>&nbsp;px</span>
+                    </div>
+                </div>
                 <div class="col-12 d-flex gap-2">
                     <button type="submit" class="btn btn-dark">Generate QR code</button>
                     <button type="button" class="btn btn-dark" @click="clear()">Clear</button>
@@ -72,11 +97,8 @@
 <script>
     function qrCodeGenerator() {
         return {
-            errorCorrectionLevel: 'M',
-            width: 512,
-            margin: 4,
-            imageUrl: '',
-            error: '',
+            errorCorrectionLevel: 'M', width: 512, margin: 4, imageUrl: '', error: '',
+            showLabel: false, labelPosition: 'below', labelText: '', labelFontSize: 20, labelCustomized: false,
             init() {
                 document.addEventListener('DOMContentLoaded', () => {
                     const editor = ace.edit('qrContent');
@@ -84,6 +106,11 @@
                     editor.session.setMode('ace/mode/text');
                     editor.session.setUseWrapMode(true);
                     editor.setOption('placeholder', 'Text, URL, Wi-Fi configuration, or other QR content');
+                    editor.session.on('change', () => {
+                        if (!this.labelCustomized) {
+                            this.labelText = editor.getValue();
+                        }
+                    });
                     new ResizeObserver(() => editor.resize()).observe(document.getElementById('qrContent'));
                 });
             },
@@ -98,19 +125,91 @@
                     return;
                 }
                 try {
-                    this.imageUrl = await window.QRCode.toDataURL(content, {
-                        errorCorrectionLevel: this.errorCorrectionLevel,
-                        width: this.width,
-                        margin: this.margin,
-                        color: { dark: '#000000', light: '#FFFFFFFF' },
-                    });
+                    const qrImageUrl = await window.QRCode.toDataURL(content, { errorCorrectionLevel: this.errorCorrectionLevel, width: this.width, margin: this.margin, color: { dark: '#000000', light: '#FFFFFFFF' } });
+                    this.imageUrl = this.showLabel ? await this.composeLabel(qrImageUrl, this.labelText) : qrImageUrl;
                 } catch (exception) {
                     this.imageUrl = '';
                     this.error = 'The QR code could not be generated. Try shorter content or a lower correction level.';
                 }
             },
+            loadImage(source) {
+                return new Promise((resolve, reject) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.onerror = reject;
+                    image.src = source;
+                });
+            },
+            wrapLabel(context, text, maxWidth) {
+                const lines = [];
+                const paragraphs = text.split(/\r?\n/);
+                const splitToken = (token) => {
+                    const parts = [];
+                    let part = '';
+                    for (const character of Array.from(token)) {
+                        if (part && context.measureText(part + character).width > maxWidth) {
+                            parts.push(part);
+                            part = character;
+                        } else {
+                            part += character;
+                        }
+                    }
+                    if (part) parts.push(part);
+                    return parts;
+                };
+                paragraphs.forEach((paragraph) => {
+                    if (!paragraph) {
+                        lines.push('');
+                        return;
+                    }
+                    const words = paragraph.split(/\s+/).flatMap(splitToken);
+                    let line = '';
+                    words.forEach((word) => {
+                        const candidate = line ? line + ' ' + word : word;
+                        if (line && context.measureText(candidate).width > maxWidth) {
+                            lines.push(line);
+                            line = word;
+                        } else {
+                            line = candidate;
+                        }
+                    });
+                    lines.push(line);
+                });
+                return lines;
+            },
+            async composeLabel(qrImageUrl, text) {
+                const qrImage = await this.loadImage(qrImageUrl);
+                const fontSize = Math.min(48, Math.max(12, Number(this.labelFontSize) || 20));
+                const padding = Math.max(12, Math.round(fontSize * 0.75));
+                const lineHeight = Math.round(fontSize * 1.35);
+                const measureCanvas = document.createElement('canvas');
+                const measureContext = measureCanvas.getContext('2d');
+                measureContext.font = fontSize + 'px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                const lines = this.wrapLabel(measureContext, text, qrImage.width - (padding * 2));
+                const labelHeight = (padding * 2) + (lines.length * lineHeight);
+                const canvas = document.createElement('canvas');
+                canvas.width = qrImage.width;
+                canvas.height = qrImage.height + labelHeight;
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#FFFFFF';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                const qrY = this.labelPosition === 'above' ? labelHeight : 0;
+                const labelY = this.labelPosition === 'above' ? padding : qrImage.height + padding;
+                context.drawImage(qrImage, 0, qrY, qrImage.width, qrImage.height);
+                context.fillStyle = '#000000';
+                context.font = measureContext.font;
+                context.textAlign = 'center';
+                context.textBaseline = 'top';
+                lines.forEach((line, index) => context.fillText(line, canvas.width / 2, labelY + (index * lineHeight)));
+                return canvas.toDataURL('image/png');
+            },
             clear() {
                 ace.edit('qrContent').setValue('', -1);
+                this.showLabel = false;
+                this.labelPosition = 'below';
+                this.labelText = '';
+                this.labelFontSize = 20;
+                this.labelCustomized = false;
                 this.imageUrl = '';
                 this.error = '';
             },
