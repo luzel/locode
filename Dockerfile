@@ -9,7 +9,7 @@ COPY app/public ./public
 
 RUN npm ci && npm run build
 
-FROM dunglas/frankenphp:1-php8.4 AS php-base
+FROM dunglas/frankenphp:1.13.2-php8.4 AS php-base
 
 RUN install-php-extensions intl opcache pdo_mysql zip
 
